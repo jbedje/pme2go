@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "Bash(sed:*)",
+      "Bash(grep:*)",
+      "Bash(xxd:*)",
+      "Bash(find:*)",
+      "Bash(node:*)",
+      "Bash(rm:*)",
+      "Bash(npm start)",
+      "Bash(set BROWSER=none)",
+      "Bash(set PORT=3001)",
+      "Bash(npx:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run server:*)",
+      "Bash(curl:*)",
+      "Bash(npm run migrate:*)",
+      "Bash(psql:*)",
+      "Bash(pg_isready:*)",
+      "Bash(where psql)",
+      "Bash(dir \"C:\\Postgresql\\17\\data\\log\" /o-d)",
+      "Bash(sc query:*)",
+      "Bash(set PGPASSWORD=Postgres2024!)",
+      "Bash(cp:*)",
+      "Bash(pkill:*)",
+      "Bash(chmod:*)",
+      "Bash(mv:*)",
+      "Bash(./scripts/github-setup.sh:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
