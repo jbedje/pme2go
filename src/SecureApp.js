@@ -4,6 +4,8 @@ import Header from './components/Layout/Header';
 import Sidebar from './components/Layout/Sidebar';
 import SecureLoginForm from './components/Auth/SecureLoginForm';
 import SecureRegisterForm from './components/Auth/SecureRegisterForm';
+import LandingPage from './components/Landing/LandingPage';
+import ProfilePage from './components/Profile/ProfilePage';
 import Dashboard from './components/Dashboard/Dashboard';
 import SearchPage from './components/Search/SearchPage';
 import ProfileDetail from './components/Profile/ProfileDetail';
@@ -134,7 +136,7 @@ function AuthenticatedLayout() {
       case 'settings':
         return <SettingsPlaceholder />;
       case 'profile':
-        return <ProfilePlaceholder />;
+        return <ProfilePage />;
       case 'admin':
         return <AdminDashboard />;
       default:
@@ -198,117 +200,10 @@ function SettingsPlaceholder() {
   );
 }
 
-function ProfilePlaceholder() {
-  const { user, updateProfile, loadingStates } = useSecureApp();
-
-  const handleUpdateProfile = async (e) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    const profileData = {
-      name: formData.get('name'),
-      description: formData.get('description'),
-      industry: formData.get('industry'),
-      location: formData.get('location')
-    };
-
-    const success = await updateProfile(profileData);
-    if (success) {
-      console.log('Profile updated successfully');
-    }
-  };
-
-  return (
-    <div className="max-w-2xl mx-auto">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            Mon Profil
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Gérez les informations de votre profil professionnel
-          </p>
-        </div>
-
-        <form onSubmit={handleUpdateProfile} className="p-6 space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Nom de l'entreprise / Nom complet
-            </label>
-            <input
-              type="text"
-              name="name"
-              defaultValue={user?.name || ''}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Description
-            </label>
-            <textarea
-              name="description"
-              defaultValue={user?.description || ''}
-              rows="4"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="Décrivez votre entreprise ou votre expertise..."
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Secteur d'activité
-              </label>
-              <input
-                type="text"
-                name="industry"
-                defaultValue={user?.industry || ''}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="ex: Technologie, Finance..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Localisation
-              </label>
-              <input
-                type="text"
-                name="location"
-                defaultValue={user?.location || ''}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="ex: Paris, France"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-4">
-            <button
-              type="submit"
-              disabled={loadingStates.profile}
-              className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-            >
-              {loadingStates.profile && <LoadingSpinner size="sm" />}
-              <span>{loadingStates.profile ? 'Mise à jour...' : 'Mettre à jour'}</span>
-            </button>
-          </div>
-        </form>
-
-        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-t border-gray-200 dark:border-gray-700">
-          <p className="text-sm text-blue-700 dark:text-blue-300">
-            🔒 Votre profil est maintenant géré de manière sécurisée avec authentification JWT
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // Composant principal de l'application
 function SecureAppContent() {
-  const { isAuthenticated, currentView, loading } = useSecureApp();
+  const { isAuthenticated, currentView, loading, setView } = useSecureApp();
 
   if (loading) {
     return (
@@ -325,7 +220,11 @@ function SecureAppContent() {
     if (currentView === 'register') {
       return <SecureRegisterForm />;
     }
-    return <SecureLoginForm />;
+    if (currentView === 'login') {
+      return <SecureLoginForm />;
+    }
+    // Show landing page by default for non-authenticated users
+    return <LandingPage onGetStarted={() => setView('login')} />;
   }
 
   return <AuthenticatedLayout />;

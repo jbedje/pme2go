@@ -19,12 +19,23 @@ import { EventCard } from '../UI/Card';
 import { Modal } from '../UI/Modal';
 
 export default function EventsPage() {
-  const { events, user, addNotification } = useSecureApp();
+  const { events, user, addNotification, createEvent } = useSecureApp();
   const [showFilters, setShowFilters] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
   const [registeredEvents, setRegisteredEvents] = useState([]);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  
+  const [newEvent, setNewEvent] = useState({
+    title: '',
+    type: 'Workshop',
+    eventDate: '',
+    location: '',
+    description: '',
+    price: 'Gratuit',
+    tags: ''
+  });
 
   const eventTypes = ['Networking', 'Formation', 'Conférence', 'Workshop', 'Pitch', 'Webinar'];
   
@@ -96,6 +107,30 @@ export default function EventsPage() {
     setSelectedEvent(null);
   };
 
+  const handleCreateEvent = async (e) => {
+    e.preventDefault();
+    
+    const eventData = {
+      ...newEvent,
+      tags: newEvent.tags.split(',').map(t => t.trim()).filter(Boolean),
+      date: newEvent.eventDate
+    };
+
+    const success = await createEvent(eventData);
+    if (success) {
+      setShowCreateModal(false);
+      setNewEvent({
+        title: '',
+        type: 'Workshop',
+        eventDate: '',
+        location: '',
+        description: '',
+        price: 'Gratuit',
+        tags: ''
+      });
+    }
+  };
+
   const formatEventDate = (dateString) => {
     const date = new Date(dateString);
     return {
@@ -135,7 +170,10 @@ export default function EventsPage() {
           </p>
         </div>
         
-        <button className="btn-primary flex items-center space-x-2">
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="btn-primary flex items-center space-x-2"
+        >
           <Plus size={18} />
           <span>Créer un événement</span>
         </button>
@@ -363,6 +401,129 @@ export default function EventsPage() {
           })}
         </div>
       )}
+
+      {/* Modal de création d'événement */}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Créer un nouvel événement"
+        size="lg"
+      >
+        <form onSubmit={handleCreateEvent} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Titre de l'événement
+              </label>
+              <input
+                type="text"
+                value={newEvent.title}
+                onChange={(e) => setNewEvent(prev => ({ ...prev, title: e.target.value }))}
+                className="input-field"
+                placeholder="Ex: Conférence Innovation & Startups"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Type d'événement
+              </label>
+              <select
+                value={newEvent.type}
+                onChange={(e) => setNewEvent(prev => ({ ...prev, type: e.target.value }))}
+                className="input-field"
+                required
+              >
+                {eventTypes.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Date et heure
+              </label>
+              <input
+                type="datetime-local"
+                value={newEvent.eventDate}
+                onChange={(e) => setNewEvent(prev => ({ ...prev, eventDate: e.target.value }))}
+                className="input-field"
+                required
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Lieu
+              </label>
+              <input
+                type="text"
+                value={newEvent.location}
+                onChange={(e) => setNewEvent(prev => ({ ...prev, location: e.target.value }))}
+                className="input-field"
+                placeholder="Ex: Paris, France - Centre des Congrès"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Prix
+              </label>
+              <input
+                type="text"
+                value={newEvent.price}
+                onChange={(e) => setNewEvent(prev => ({ ...prev, price: e.target.value }))}
+                className="input-field"
+                placeholder="Ex: 50€, Gratuit"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Description
+            </label>
+            <textarea
+              value={newEvent.description}
+              onChange={(e) => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
+              rows={4}
+              className="input-field resize-none"
+              placeholder="Décrivez votre événement, le programme, les objectifs..."
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Tags (séparés par des virgules)
+            </label>
+            <input
+              type="text"
+              value={newEvent.tags}
+              onChange={(e) => setNewEvent(prev => ({ ...prev, tags: e.target.value }))}
+              className="input-field"
+              placeholder="Ex: Innovation, Startups, Networking, Tech"
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-6">
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(false)}
+              className="btn-secondary"
+            >
+              Annuler
+            </button>
+            <button type="submit" className="btn-primary">
+              Créer l'événement
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Modal de détail d'événement */}
       <Modal

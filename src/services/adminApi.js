@@ -1,5 +1,5 @@
 // Admin API service layer for PME2GO admin dashboard
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3004/api';
+const API_BASE_URL = process.env.REACT_APP_SECURE_API_URL || 'http://localhost:3002/api';
 
 class AdminApiService {
   constructor() {
@@ -163,9 +163,9 @@ class AdminApiService {
   formatSystemHealth(health) {
     return {
       ...health,
-      statusColor: health.status === 'healthy' ? 'green' : 'red',
-      uptimeDisplay: this.formatUptime(health.checks.uptime),
-      memoryDisplay: health.checks.memory_usage
+      statusColor: health.api?.status === 'healthy' ? 'green' : 'red',
+      uptimeDisplay: this.formatUptime(health.server?.uptime || 0),
+      memoryDisplay: health.server?.memory || 'N/A'
     };
   }
 
@@ -210,12 +210,24 @@ class AdminApiService {
 
   // Check if user has admin access
   checkAdminAccess(user) {
-    return user && user.role && ['admin', 'super_admin'].includes(user.role);
+    if (!user) return false;
+    
+    // Check both role and type fields for admin access
+    const adminRoles = ['admin', 'super_admin'];
+    const adminTypes = ['admin', 'super_admin', 'System Admin', 'Administrator'];
+    
+    return (user.role && adminRoles.includes(user.role)) ||
+           (user.type && adminTypes.includes(user.type));
   }
 
   // Check if user is super admin
   checkSuperAdminAccess(user) {
-    return user && user.role === 'super_admin';
+    if (!user) return false;
+    
+    return (user.role === 'super_admin') || 
+           (user.type === 'super_admin') || 
+           (user.type === 'System Admin') ||
+           (user.type === 'Administrator');
   }
 }
 

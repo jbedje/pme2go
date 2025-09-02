@@ -1,0 +1,13 @@
+{
+  "title": "Développeur Full Stack React/Node.js",
+  "type": "Mission",
+  "company": "TechStart Solutions",
+  "industry": "Technologie",
+  "location": "Paris, France",
+  "budget": "50-70€/jour",
+  "duration": "3-6 mois",
+  "description": "Recherche d'un développeur expérimenté pour développer une application web moderne avec React et Node.js. Le projet inclut la création d'une API REST, interface utilisateur responsive, et intégration base de données.",
+  "requirements": ["5+ ans d'expérience React", "Maîtrise Node.js", "Connaissance PostgreSQL"],
+  "tags": ["React", "Node.js", "Full Stack", "Remote"],
+  "deadline": "2025-09-15"
+}

@@ -18,7 +18,7 @@ const USER_TYPES = {
 const initialState = {
   user: null,
   isAuthenticated: false,
-  currentView: 'dashboard',
+  currentView: 'landing',
   theme: 'light',
   language: 'fr',
   notifications: [],
@@ -98,7 +98,7 @@ function appReducer(state, action) {
         ...state,
         user: null,
         isAuthenticated: false,
-        currentView: 'login',
+        currentView: 'landing',
         selectedProfile: null,
         chatActiveContact: null
       };
@@ -304,11 +304,34 @@ export function AppProvider({ children }) {
             console.error('Error parsing stored user:', error);
             localStorage.removeItem('pme2go_token');
             localStorage.removeItem('pme2go_user');
+            // Ensure landing page is shown when auth fails
+            dispatch({ type: 'SET_VIEW', payload: 'landing' });
           }
+        } else {
+          // No stored authentication - ensure landing page is shown
+          dispatch({ type: 'SET_VIEW', payload: 'landing' });
         }
       } catch (error) {
         console.log('API not available, using demo data');
         dispatch({ type: 'SET_API_STATUS', payload: { connected: false } });
+        
+        // When API fails, check authentication and default to landing if not authenticated
+        const storedToken = localStorage.getItem('pme2go_token');
+        const storedUser = localStorage.getItem('pme2go_user');
+        
+        if (storedToken && storedUser) {
+          try {
+            const user = JSON.parse(storedUser);
+            dispatch({ type: 'LOGIN', payload: user });
+          } catch (parseError) {
+            console.error('Error parsing stored user:', parseError);
+            localStorage.removeItem('pme2go_token');
+            localStorage.removeItem('pme2go_user');
+            dispatch({ type: 'SET_VIEW', payload: 'landing' });
+          }
+        } else {
+          dispatch({ type: 'SET_VIEW', payload: 'landing' });
+        }
       }
     };
 
@@ -545,6 +568,10 @@ export function AppProvider({ children }) {
   };
 
   const logout = () => {
+    // Clear stored session data
+    localStorage.removeItem('pme2go_token');
+    localStorage.removeItem('pme2go_user');
+    
     dispatch({ type: 'LOGOUT' });
     addNotification({
       id: Date.now().toString(),

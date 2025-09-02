@@ -15,6 +15,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { useSecureApp } from '../../contexts/SecureAppContext';
+import { Modal } from '../UI/Modal';
 
 export default function MessagesPage() {
   const { 
@@ -38,6 +39,7 @@ export default function MessagesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const [showNewConversationModal, setShowNewConversationModal] = useState(false);
 
   // Liste des contacts avec qui l'utilisateur a eu des conversations
   const getContacts = () => {
@@ -163,6 +165,17 @@ export default function MessagesPage() {
       return 'online';
     }
     return 'offline';
+  };
+
+  const handleStartNewConversation = (selectedUser) => {
+    setChatActiveContact(selectedUser);
+    setShowNewConversationModal(false);
+  };
+
+  // Get users who are not already in conversation with current user
+  const getAvailableUsers = () => {
+    const contactIds = new Set(contacts.map(c => c.id));
+    return users.filter(u => u.id !== user.id && !contactIds.has(u.id));
   };
 
   return (
@@ -428,10 +441,7 @@ export default function MessagesPage() {
                 Choisissez une conversation existante ou commencez-en une nouvelle.
               </p>
               <button
-                onClick={() => {
-                  // Ici on pourrait ouvrir un modal pour sélectionner un contact
-                  console.log('Nouvelle conversation');
-                }}
+                onClick={() => setShowNewConversationModal(true)}
                 className="btn-primary"
               >
                 Nouvelle conversation
@@ -440,6 +450,66 @@ export default function MessagesPage() {
           </div>
         )}
       </div>
+
+      {/* Modal de nouvelle conversation */}
+      <Modal
+        isOpen={showNewConversationModal}
+        onClose={() => setShowNewConversationModal(false)}
+        title="Démarrer une nouvelle conversation"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            Sélectionnez un utilisateur pour commencer une nouvelle conversation:
+          </p>
+          
+          <div className="max-h-96 overflow-y-auto">
+            {getAvailableUsers().length === 0 ? (
+              <div className="text-center py-8">
+                <Users className="mx-auto text-gray-400 mb-4" size={48} />
+                <p className="text-gray-500 dark:text-gray-400">
+                  Tous les utilisateurs disponibles sont déjà dans vos conversations.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {getAvailableUsers().map((user) => (
+                  <button
+                    key={user.id}
+                    onClick={() => handleStartNewConversation(user)}
+                    className="w-full p-3 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <img
+                        src={user.avatar}
+                        alt={user.name}
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                      <div>
+                        <h3 className="font-medium text-gray-900 dark:text-gray-100">
+                          {user.name}
+                        </h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {user.type}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end pt-4">
+            <button
+              onClick={() => setShowNewConversationModal(false)}
+              className="btn-secondary"
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

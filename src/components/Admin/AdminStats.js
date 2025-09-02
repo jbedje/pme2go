@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../../contexts/AppContextWithAPI';
+import { useSecureApp } from '../../contexts/SecureAppContext';
 import adminApi from '../../services/adminApi';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 
 function AdminStats({ onLoading }) {
-  const { addNotification } = useApp();
+  const { addNotification } = useSecureApp();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -98,7 +98,7 @@ function AdminStats({ onLoading }) {
             </div>
             <div className="ml-4">
               <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                {stats.users.total.toLocaleString()}
+                {(stats.users?.total || 0).toLocaleString()}
               </p>
               <p className="text-blue-700 dark:text-blue-300 text-sm">Total Users</p>
             </div>
@@ -112,7 +112,7 @@ function AdminStats({ onLoading }) {
             </div>
             <div className="ml-4">
               <p className="text-2xl font-bold text-green-900 dark:text-green-100">
-                {stats.users.active.toLocaleString()}
+                {(stats.users?.active || 0).toLocaleString()}
               </p>
               <p className="text-green-700 dark:text-green-300 text-sm">Active Users</p>
             </div>
@@ -126,7 +126,7 @@ function AdminStats({ onLoading }) {
             </div>
             <div className="ml-4">
               <p className="text-2xl font-bold text-yellow-900 dark:text-yellow-100">
-                {stats.users.recent.toLocaleString()}
+                {(stats.users?.recent || 0).toLocaleString()}
               </p>
               <p className="text-yellow-700 dark:text-yellow-300 text-sm">New Users (7d)</p>
             </div>
@@ -140,7 +140,7 @@ function AdminStats({ onLoading }) {
             </div>
             <div className="ml-4">
               <p className="text-2xl font-bold text-red-900 dark:text-red-100">
-                {stats.users.banned.toLocaleString()}
+                {(stats.users?.banned || 0).toLocaleString()}
               </p>
               <p className="text-red-700 dark:text-red-300 text-sm">Banned Users</p>
             </div>
@@ -157,7 +157,7 @@ function AdminStats({ onLoading }) {
             </div>
             <div className="ml-4">
               <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-                {stats.activity.messages_24h.toLocaleString()}
+                {(stats.activity?.messages_24h || 0).toLocaleString()}
               </p>
               <p className="text-purple-700 dark:text-purple-300 text-sm">Messages (24h)</p>
             </div>
@@ -171,7 +171,7 @@ function AdminStats({ onLoading }) {
             </div>
             <div className="ml-4">
               <p className="text-2xl font-bold text-indigo-900 dark:text-indigo-100">
-                {stats.activity.notifications_24h.toLocaleString()}
+                {(stats.activity?.notifications_24h || 0).toLocaleString()}
               </p>
               <p className="text-indigo-700 dark:text-indigo-300 text-sm">Notifications (24h)</p>
             </div>
@@ -185,7 +185,7 @@ function AdminStats({ onLoading }) {
             </div>
             <div className="ml-4">
               <p className="text-2xl font-bold text-teal-900 dark:text-teal-100">
-                {stats.activity.connections.toLocaleString()}
+                {(stats.activity?.connections || 0).toLocaleString()}
               </p>
               <p className="text-teal-700 dark:text-teal-300 text-sm">Total Connections</p>
             </div>
@@ -199,7 +199,7 @@ function AdminStats({ onLoading }) {
           User Type Distribution
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {stats.distribution.map((item, index) => (
+          {(stats.distribution || []).map((item, index) => (
             <div key={index} className="flex justify-between items-center p-3 bg-white dark:bg-gray-800 rounded-lg">
               <span className="text-gray-700 dark:text-gray-300">{item.type}</span>
               <div className="flex items-center">
@@ -209,7 +209,7 @@ function AdminStats({ onLoading }) {
                 <div 
                   className="bg-blue-500 rounded-full h-2"
                   style={{ 
-                    width: `${Math.max(10, (parseInt(item.count) / stats.users.total) * 100)}px` 
+                    width: `${Math.max(10, (parseInt(item.count) / (stats.users?.total || 1)) * 100)}px` 
                   }}
                 ></div>
               </div>

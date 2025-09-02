@@ -1,3 +1,4 @@
+require('dotenv').config({ path: '../.env' });
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -25,7 +26,7 @@ const {
 } = require('./performance-api');
 
 const app = express();
-const PORT = process.env.PORT || 3004; // Railway will set PORT automatically
+const PORT = process.env.SERVER_PORT || process.env.PORT || 3004; // Use SERVER_PORT for local development
 
 // Security Configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
@@ -122,7 +123,7 @@ async function testDatabaseConnection() {
 // JWT Token Utilities
 function generateTokens(user) {
   const payload = {
-    userId: user.id || user.uuid,
+    userId: user.uuid || user.id,
     email: user.email,
     type: user.type
   };
@@ -776,6 +777,14 @@ app.use('/api/admin', authenticateToken, adminRouter);
 // === PERFORMANCE MONITORING ROUTES ===
 app.use('/api/admin/performance', authenticateToken, performanceRouter);
 
+// Public performance dashboard (no authentication)
+app.get('/performance-dashboard', (req, res) => {
+  const dashboardHtml = require('./performance-api').generatePerformanceDashboard?.() || 
+    '<h1>Dashboard Unavailable</h1><p>Please use /api/admin/performance/dashboard with authentication.</p>';
+  res.set('Content-Type', 'text/html');
+  res.send(dashboardHtml);
+});
+
 // Error handling middleware
 app.use((error, req, res, next) => {
   console.error('❌ Unhandled error:', error);
@@ -1073,6 +1082,275 @@ app.post('/api/auth/reset-password', async (req, res) => {
     console.error('❌ Password reset error:', error);
     res.status(500).json({
       error: 'Erreur serveur lors de la réinitialisation',
+      code: 'INTERNAL_ERROR'
+    });
+  }
+});
+
+// =====================
+// MESSAGES ENDPOINTS
+// =====================
+
+// Send message
+app.post('/api/messages', authenticateToken, [
+  body('receiverId').notEmpty().withMessage('ID du destinataire requis'),
+  body('content').notEmpty().trim().isLength({ min: 1, max: 1000 }).withMessage('Contenu du message requis (1-1000 caractères)')
+], handleValidationErrors, async (req, res) => {
+  try {
+    const { receiverId, content } = req.body;
+    const senderId = req.user.userId;
+    
+    const uuid = uuidv4();
+    
+    const result = await logDatabaseOperation(
+      'Create message',
+      () => pool.query(`
+        INSERT INTO messages (uuid, sender_id, receiver_id, content)
+        VALUES ($1, (SELECT id FROM users WHERE uuid = $2), (SELECT id FROM users WHERE uuid = $3), $4)
+        RETURNING uuid as id, content, created_at as timestamp, read_status as read
+      `, [uuid, senderId, receiverId, content])
+    );
+    
+    const message = {
+      ...result.rows[0],
+      senderId,
+      receiverId
+    };
+    
+    loggers.api.info('Message sent successfully', {
+      messageId: message.id,
+      senderId: senderId.substring(0, 8) + '...',
+      receiverId: receiverId.substring(0, 8) + '...'
+    });
+    
+    res.status(201).json(message);
+  } catch (error) {
+    console.error('❌ Send message error:', error);
+    loggers.api.error('Failed to send message', { error: error.message });
+    res.status(500).json({ 
+      error: 'Erreur lors de l\'envoi du message',
+      code: 'INTERNAL_ERROR'
+    });
+  }
+});
+
+// Get messages for user
+app.get('/api/messages/:userId', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentUserId = req.user.userId;
+    
+    const result = await logDatabaseOperation(
+      'Get user messages',
+      () => pool.query(`
+        SELECT m.uuid as id, m.content, m.created_at as timestamp, 
+               m.read_status as read,
+               sender.uuid as sender_id, receiver.uuid as receiver_id,
+               sender.name as sender_name, receiver.name as receiver_name
+        FROM messages m
+        JOIN users sender ON m.sender_id = sender.id
+        JOIN users receiver ON m.receiver_id = receiver.id
+        WHERE (sender.uuid = $1 AND receiver.uuid = $2) 
+           OR (sender.uuid = $2 AND receiver.uuid = $1)
+        ORDER BY m.created_at DESC
+        LIMIT 50
+      `, [currentUserId, userId])
+    );
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ Get messages error:', error);
+    loggers.api.error('Failed to get messages', { error: error.message });
+    res.status(500).json({ 
+      error: 'Erreur lors de la récupération des messages',
+      code: 'INTERNAL_ERROR'
+    });
+  }
+});
+
+// =====================
+// OPPORTUNITIES ENDPOINTS
+// =====================
+
+// Create opportunity
+app.post('/api/opportunities', authenticateToken, [
+  body('title').notEmpty().trim().isLength({ min: 5, max: 200 }).withMessage('Titre requis (5-200 caractères)'),
+  body('type').isIn(['Mission', 'Emploi', 'Stage', 'Freelance', 'Partenariat', 'Autre']).withMessage('Type invalide'),
+  body('company').optional().trim().isLength({ max: 100 }),
+  body('industry').optional().trim().isLength({ max: 100 }),
+  body('location').optional().trim().isLength({ max: 255 }),
+  body('budget').optional().trim().isLength({ max: 100 }),
+  body('duration').optional().trim().isLength({ max: 100 }),
+  body('description').notEmpty().trim().isLength({ min: 10, max: 2000 }).withMessage('Description requise (10-2000 caractères)'),
+  body('deadline').optional().isISO8601().withMessage('Date limite invalide')
+], handleValidationErrors, async (req, res) => {
+  try {
+    const { title, type, company, industry, location, budget, duration, description, requirements, tags, deadline } = req.body;
+    const authorId = req.user.userId;
+    
+    const uuid = uuidv4();
+    
+    const result = await logDatabaseOperation(
+      'Create opportunity',
+      () => pool.query(`
+        INSERT INTO opportunities (uuid, title, type, author_id, company, industry, location, budget, duration, description, requirements, tags, deadline)
+        VALUES ($1, $2, $3, (SELECT id FROM users WHERE uuid = $4), $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        RETURNING uuid as id, title, type, company, industry, location, budget, duration, description, requirements, tags, deadline, created_at
+      `, [uuid, title, type, authorId, company, industry, location, budget, duration, description, requirements || [], tags || [], deadline])
+    );
+    
+    loggers.api.info('Opportunity created successfully', {
+      opportunityId: result.rows[0].id,
+      authorId: authorId.substring(0, 8) + '...',
+      title: title.substring(0, 50)
+    });
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Create opportunity error:', error);
+    loggers.api.error('Failed to create opportunity', { error: error.message });
+    res.status(500).json({ 
+      error: 'Erreur lors de la création de l\'opportunité',
+      code: 'INTERNAL_ERROR'
+    });
+  }
+});
+
+// Get opportunities
+app.get('/api/opportunities', authenticateToken, async (req, res) => {
+  try {
+    const { type, industry, location, keywords } = req.query;
+    
+    let query = `
+      SELECT o.uuid as id, o.title, o.type, o.company, o.industry, o.location, 
+             o.budget, o.duration, o.description, o.requirements, o.tags, o.deadline,
+             o.created_at, u.name as author_name, u.uuid as author_id
+      FROM opportunities o
+      JOIN users u ON o.author_id = u.id
+      WHERE 1=1
+    `;
+    const params = [];
+    
+    if (type) {
+      params.push(type);
+      query += ` AND o.type = $${params.length}`;
+    }
+    
+    if (industry) {
+      params.push(industry);
+      query += ` AND o.industry = $${params.length}`;
+    }
+    
+    if (location) {
+      params.push(`%${location}%`);
+      query += ` AND o.location ILIKE $${params.length}`;
+    }
+    
+    if (keywords) {
+      params.push(`%${keywords}%`);
+      query += ` AND (o.title ILIKE $${params.length} OR o.description ILIKE $${params.length})`;
+    }
+    
+    query += ` ORDER BY o.created_at DESC LIMIT 50`;
+    
+    const result = await logDatabaseOperation('Get opportunities', () => pool.query(query, params));
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ Get opportunities error:', error);
+    loggers.api.error('Failed to get opportunities', { error: error.message });
+    res.status(500).json({ 
+      error: 'Erreur lors de la récupération des opportunités',
+      code: 'INTERNAL_ERROR'
+    });
+  }
+});
+
+// =====================
+// EVENTS ENDPOINTS
+// =====================
+
+// Create event
+app.post('/api/events', authenticateToken, [
+  body('title').notEmpty().trim().isLength({ min: 5, max: 200 }).withMessage('Titre requis (5-200 caractères)'),
+  body('type').notEmpty().trim().withMessage('Type d\'événement requis'),
+  body('event_date').isISO8601().withMessage('Date d\'événement requise et valide'),
+  body('location').optional().trim().isLength({ max: 255 }),
+  body('description').notEmpty().trim().isLength({ min: 10, max: 2000 }).withMessage('Description requise (10-2000 caractères)'),
+  body('price').optional().trim().isLength({ max: 50 })
+], handleValidationErrors, async (req, res) => {
+  try {
+    const { title, type, event_date, location, description, price, tags } = req.body;
+    const organizerId = req.user.userId;
+    
+    const uuid = uuidv4();
+    
+    // Get organizer name
+    const organizerResult = await pool.query('SELECT name FROM users WHERE uuid = $1', [organizerId]);
+    const organizer = organizerResult.rows[0]?.name || 'Organisateur';
+    
+    const result = await logDatabaseOperation(
+      'Create event',
+      () => pool.query(`
+        INSERT INTO events (uuid, title, type, organizer, organizer_id, event_date, location, description, price, tags)
+        VALUES ($1, $2, $3, $4, (SELECT id FROM users WHERE uuid = $5), $6, $7, $8, $9, $10)
+        RETURNING uuid as id, title, type, organizer, event_date as date, location, description, attendees, price, tags, created_at
+      `, [uuid, title, type, organizer, organizerId, event_date, location, description, price, tags || []])
+    );
+    
+    loggers.api.info('Event created successfully', {
+      eventId: result.rows[0].id,
+      organizerId: organizerId.substring(0, 8) + '...',
+      title: title.substring(0, 50)
+    });
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('❌ Create event error:', error);
+    loggers.api.error('Failed to create event', { error: error.message });
+    res.status(500).json({ 
+      error: 'Erreur lors de la création de l\'événement',
+      code: 'INTERNAL_ERROR'
+    });
+  }
+});
+
+// Get events
+app.get('/api/events', authenticateToken, async (req, res) => {
+  try {
+    const { type, location, keywords } = req.query;
+    
+    let query = `
+      SELECT uuid as id, title, type, organizer, event_date as date, location,
+             description, attendees, price, tags, created_at
+      FROM events
+      WHERE event_date >= NOW()
+    `;
+    const params = [];
+    
+    if (type) {
+      params.push(type);
+      query += ` AND type = $${params.length}`;
+    }
+    
+    if (location) {
+      params.push(`%${location}%`);
+      query += ` AND location ILIKE $${params.length}`;
+    }
+    
+    if (keywords) {
+      params.push(`%${keywords}%`);
+      query += ` AND (title ILIKE $${params.length} OR description ILIKE $${params.length})`;
+    }
+    
+    query += ` ORDER BY event_date ASC LIMIT 50`;
+    
+    const result = await logDatabaseOperation('Get events', () => pool.query(query, params));
+    res.json(result.rows);
+  } catch (error) {
+    console.error('❌ Get events error:', error);
+    loggers.api.error('Failed to get events', { error: error.message });
+    res.status(500).json({ 
+      error: 'Erreur lors de la récupération des événements',
       code: 'INTERNAL_ERROR'
     });
   }

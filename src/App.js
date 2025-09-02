@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import { AppProvider, useApp } from './contexts/AppContextWithAPI';
 import Header from './components/Layout/Header';
 import Sidebar from './components/Layout/Sidebar';
+import CipmeFooter from './components/Layout/CipmeFooter';
+import LandingPage from './components/Landing/LandingPage';
 import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
 import Dashboard from './components/Dashboard/Dashboard';
@@ -124,9 +126,9 @@ function AuthenticatedLayout() {
   };
 
   return (
-    <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 ${theme === 'dark' ? 'dark' : ''}`}>
+    <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col ${theme === 'dark' ? 'dark' : ''}`}>
       <Header />
-      <div className="flex">
+      <div className="flex flex-1">
         <Sidebar />
         <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'ml-0' : 'ml-0'}`}>
           <div className="p-6">
@@ -134,6 +136,7 @@ function AuthenticatedLayout() {
           </div>
         </main>
       </div>
+      <CipmeFooter />
       <NotificationToast />
       <ConnectionStatus />
     </div>
@@ -207,7 +210,7 @@ function ProfilePlaceholder() {
 
 // Composant principal de l'application
 function AppContent() {
-  const { isAuthenticated, currentView, loading } = useApp();
+  const { isAuthenticated, currentView, loading, setView } = useApp();
 
   if (loading) {
     return (
@@ -224,7 +227,11 @@ function AppContent() {
     if (currentView === 'register') {
       return <RegisterForm />;
     }
-    return <LoginForm />;
+    if (currentView === 'login') {
+      return <LoginForm />;
+    }
+    // Show landing page by default for non-authenticated users  
+    return <LandingPage onGetStarted={() => setView('login')} />;
   }
 
   return <AuthenticatedLayout />;

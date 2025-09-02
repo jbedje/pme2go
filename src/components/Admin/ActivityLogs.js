@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../../contexts/AppContextWithAPI';
+import { useSecureApp } from '../../contexts/SecureAppContext';
 import adminApi from '../../services/adminApi';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 
 function ActivityLogs({ onLoading }) {
-  const { addNotification } = useApp();
+  const { addNotification } = useSecureApp();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

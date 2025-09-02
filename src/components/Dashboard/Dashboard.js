@@ -148,13 +148,16 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Header de bienvenue */}
-      <div className="gradient-bg rounded-2xl p-8 text-white">
+      {/* Header de bienvenue CIPME */}
+      <div className="cipme-gradient rounded-2xl p-8 text-white">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold mb-2">{getWelcomeMessage()}</h1>
-            <p className="text-primary-100 text-lg">
-              Voici un aperçu de votre activité sur PME2GO
+            <p className="text-orange-100 text-lg">
+              Votre écosystème PME - Powered by CIPME
+            </p>
+            <p className="text-orange-200 text-sm mt-1">
+              Accompagner l'audace et l'ambition de nos entrepreneur.e.s
             </p>
             <div className="flex items-center space-x-4 mt-4">
               <div className="flex items-center space-x-2">

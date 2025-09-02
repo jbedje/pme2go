@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../../contexts/AppContextWithAPI';
+import { useSecureApp } from '../../contexts/SecureAppContext';
 import adminApi from '../../services/adminApi';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import UserEditModal from './UserEditModal';
 
 function UserManagement({ isSuperAdmin, onLoading }) {
-  const { addNotification } = useApp();
+  const { addNotification } = useSecureApp();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -28,8 +28,8 @@ function UserManagement({ isSuperAdmin, onLoading }) {
       onLoading?.(true);
       
       const data = await adminApi.getUsers(filters);
-      setUsers(data.users.map(user => adminApi.formatUserForDisplay(user)));
-      setPagination(data.pagination);
+      setUsers((data?.users || []).map(user => adminApi.formatUserForDisplay(user)));
+      setPagination(data?.pagination || {});
     } catch (error) {
       console.error('Error fetching users:', error);
       setError(error.message);
@@ -242,7 +242,7 @@ function UserManagement({ isSuperAdmin, onLoading }) {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {users.map((user) => (
+              {(users || []).map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>

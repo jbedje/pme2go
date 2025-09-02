@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../../contexts/AppContextWithAPI';
+import { useSecureApp } from '../../contexts/SecureAppContext';
 import adminApi from '../../services/adminApi';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 
 function SystemSettings({ isSuperAdmin, onLoading }) {
-  const { addNotification } = useApp();
+  const { addNotification } = useSecureApp();
   const [settings, setSettings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

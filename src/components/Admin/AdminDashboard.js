@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../../contexts/AppContextWithAPI';
+import { useSecureApp } from '../../contexts/SecureAppContext';
 import adminApi from '../../services/adminApi';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import AdminStats from './AdminStats';
@@ -9,7 +9,7 @@ import ActivityLogs from './ActivityLogs';
 import SystemSettings from './SystemSettings';
 
 function AdminDashboard() {
-  const { user, addNotification } = useApp();
+  const { user, addNotification } = useSecureApp();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   

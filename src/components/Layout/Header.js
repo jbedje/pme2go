@@ -60,11 +60,18 @@ export default function Header() {
             <Menu size={20} className="text-gray-600 dark:text-gray-300" />
           </button>
           
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-primary-600 to-primary-700 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">P2G</span>
+          <div className="flex items-center space-x-3">
+            <img 
+              src="/cipme-logo.png" 
+              alt="CIPME" 
+              className="w-10 h-10 object-contain"
+            />
+            <div className="hidden md:block">
+              <h1 className="font-bold text-xl cipme-text-gradient">PME2GO</h1>
+              <p className="text-xs text-secondary-600 dark:text-secondary-400 -mt-1">
+                Powered by CIPME
+              </p>
             </div>
-            <span className="font-bold text-xl text-gradient hidden md:block">PME2GO</span>
           </div>
         </div>
 

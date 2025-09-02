@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, Users, Building } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Users, Building, ArrowLeft } from 'lucide-react';
 import { useApp } from '../../contexts/AppContextWithAPI';
 
 export default function LoginForm() {
@@ -50,16 +50,31 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 flex items-center justify-center p-4">
+    <div className="min-h-screen cipme-gradient-hero flex items-center justify-center p-4">
       <div className="max-w-md w-full">
-        {/* Logo et titre */}
+        {/* Back to landing page button */}
+        <button
+          onClick={() => setView('landing')}
+          className="mb-6 flex items-center space-x-2 text-white/80 hover:text-white transition-colors"
+        >
+          <ArrowLeft size={20} />
+          <span>Retour à l'accueil</span>
+        </button>
+        {/* CIPME Logo et titre */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl mb-4 shadow-lg">
-            <span className="text-2xl font-bold text-primary-600">P2G</span>
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-2xl mb-4 shadow-lg">
+            <img 
+              src="/cipme-logo.png" 
+              alt="CIPME" 
+              className="w-16 h-16 object-contain"
+            />
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">PME2GO</h1>
-          <p className="text-primary-100">
+          <p className="text-orange-100 mb-1">
             Connectez-vous à l'écosystème PME
+          </p>
+          <p className="text-xs text-orange-200 font-medium">
+            Powered by CIPME - Côte d'Ivoire
           </p>
         </div>
 

@@ -3,6 +3,7 @@ import { demoUsers, demoOpportunities, demoMessages, demoEvents } from '../data/
 import SecureApiService from '../services/secureApi';
 import websocketService from '../services/websocketService';
 import notificationService from '../services/notificationService';
+import adminApi from '../services/adminApi';
 
 const SecureAppContext = createContext();
 
@@ -20,7 +21,7 @@ const USER_TYPES = {
 const initialState = {
   user: null,
   isAuthenticated: false,
-  currentView: 'dashboard',
+  currentView: 'landing',
   theme: 'light',
   language: 'fr',
   notifications: [],
@@ -239,16 +240,6 @@ function secureAppReducer(state, action) {
         myOpportunities: [action.payload.id, ...state.myOpportunities]
       };
     
-    case 'UPDATE_PROFILE':
-      const updatedUsers = state.users.map(user => 
-        user.id === action.payload.id ? { ...user, ...action.payload } : user
-      );
-      return {
-        ...state,
-        users: updatedUsers,
-        user: state.user?.id === action.payload.id ? { ...state.user, ...action.payload } : state.user
-      };
-    
     case 'SEND_MESSAGE':
       const newMessage = {
         id: Date.now().toString(),
@@ -351,6 +342,12 @@ function secureAppReducer(state, action) {
         notificationsCount: Math.max(0, state.notificationsCount - 1)
       };
     
+    case 'UPDATE_PROFILE':
+      return {
+        ...state,
+        user: { ...state.user, ...action.payload }
+      };
+    
     default:
       return state;
   }
@@ -367,10 +364,19 @@ export function SecureAppProvider({ children }) {
         const savedUser = SecureApiService.getCurrentUser();
         if (savedUser && SecureApiService.isAuthenticated()) {
           dispatch({ type: 'LOGIN', payload: savedUser });
+          
+          // Check if user is admin and redirect to admin dashboard
+          if (adminApi.checkAdminAccess(savedUser)) {
+            dispatch({ type: 'SET_VIEW', payload: 'admin' });
+          }
+          
           await loadInitialData();
           
           // Initialize WebSocket for already authenticated user
           initializeWebSocket();
+        } else {
+          // No authentication found - ensure landing page is shown
+          dispatch({ type: 'SET_VIEW', payload: 'landing' });
         }
 
         // Check API connection
@@ -430,6 +436,12 @@ export function SecureAppProvider({ children }) {
       
       if (response.success) {
         dispatch({ type: 'LOGIN', payload: response.user });
+        
+        // Check if user is admin and redirect to admin dashboard
+        if (adminApi.checkAdminAccess(response.user)) {
+          dispatch({ type: 'SET_VIEW', payload: 'admin' });
+        }
+        
         await loadInitialData();
         
         // Initialize WebSocket connection
@@ -477,6 +489,12 @@ export function SecureAppProvider({ children }) {
       
       if (response.success) {
         dispatch({ type: 'LOGIN', payload: response.user });
+        
+        // Check if user is admin and redirect to admin dashboard
+        if (adminApi.checkAdminAccess(response.user)) {
+          dispatch({ type: 'SET_VIEW', payload: 'admin' });
+        }
+        
         await loadInitialData();
         
         // Initialize WebSocket connection
@@ -534,41 +552,6 @@ export function SecureAppProvider({ children }) {
     }
   };
 
-  const updateProfile = async (profileData) => {
-    try {
-      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'profile', loading: true } });
-      
-      const response = await SecureApiService.updateProfile(profileData);
-      
-      if (response.success) {
-        dispatch({ type: 'UPDATE_PROFILE', payload: { ...state.user, ...response.user } });
-        
-        addNotification({
-          id: Date.now().toString(),
-          type: 'success',
-          message: 'Profil mis à jour avec succès',
-          timestamp: new Date().toISOString()
-        });
-        
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Profile update error:', error);
-      
-      addNotification({
-        id: Date.now().toString(),
-        type: 'error',
-        message: error.message || 'Erreur lors de la mise à jour du profil',
-        timestamp: new Date().toISOString()
-      });
-      
-      return false;
-    } finally {
-      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'profile', loading: false } });
-    }
-  };
 
   const loadUsers = async (filters = {}) => {
     try {
@@ -691,14 +674,39 @@ export function SecureAppProvider({ children }) {
   };
 
   const sendMessage = async (receiverId, content) => {
-    // TODO: Implement when messages endpoint is added to secure server
-    dispatch({ type: 'SEND_MESSAGE', payload: { receiverId, content } });
-    addNotification({
-      id: Date.now().toString(),
-      type: 'success',
-      message: 'Message envoyé',
-      timestamp: new Date().toISOString()
-    });
+    try {
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'sendMessage', loading: true } });
+      
+      const response = await SecureApiService.sendMessage(receiverId, content);
+      
+      if (response.success) {
+        dispatch({ type: 'SEND_MESSAGE', payload: { receiverId, content } });
+        
+        addNotification({
+          id: Date.now().toString(),
+          type: 'success',
+          message: 'Message envoyé',
+          timestamp: new Date().toISOString()
+        });
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Send message error:', error);
+      
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: error.message || 'Erreur lors de l\'envoi du message',
+        timestamp: new Date().toISOString()
+      });
+      
+      return false;
+    } finally {
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'sendMessage', loading: false } });
+    }
   };
 
   const markMessagesAsRead = (senderId) => {
@@ -716,22 +724,89 @@ export function SecureAppProvider({ children }) {
   };
 
   const createOpportunity = async (opportunityData) => {
-    // TODO: Implement when opportunities endpoint is added to secure server
-    const newOpportunity = {
-      id: Date.now().toString(),
-      ...opportunityData,
-      authorId: state.user.id,
-      createdAt: new Date().toISOString(),
-      applicants: 0
-    };
-    dispatch({ type: 'CREATE_OPPORTUNITY', payload: newOpportunity });
-    
-    addNotification({
-      id: Date.now().toString(),
-      type: 'success',
-      message: 'Opportunité publiée avec succès',
-      timestamp: new Date().toISOString()
-    });
+    try {
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'opportunities', loading: true } });
+      
+      const response = await SecureApiService.createOpportunity(opportunityData);
+      
+      if (response.success) {
+        const newOpportunity = {
+          id: response.opportunity.id,
+          ...opportunityData,
+          authorId: state.user.id,
+          createdAt: new Date().toISOString(),
+          applicants: 0
+        };
+        dispatch({ type: 'CREATE_OPPORTUNITY', payload: newOpportunity });
+        
+        addNotification({
+          id: Date.now().toString(),
+          type: 'success',
+          message: 'Opportunité publiée avec succès',
+          timestamp: new Date().toISOString()
+        });
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Create opportunity error:', error);
+      
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: error.message || 'Erreur lors de la création de l\'opportunité',
+        timestamp: new Date().toISOString()
+      });
+      
+      return false;
+    } finally {
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'opportunities', loading: false } });
+    }
+  };
+
+  const createEvent = async (eventData) => {
+    try {
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'events', loading: true } });
+      
+      const response = await SecureApiService.createEvent(eventData);
+      
+      if (response.success) {
+        const newEvent = {
+          id: response.event.id,
+          ...eventData,
+          organizer: state.user.name,
+          createdAt: new Date().toISOString(),
+          attendees: 0
+        };
+        dispatch({ type: 'SET_EVENTS', payload: [newEvent, ...state.events] });
+        
+        addNotification({
+          id: Date.now().toString(),
+          type: 'success',
+          message: 'Événement créé avec succès',
+          timestamp: new Date().toISOString()
+        });
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Create event error:', error);
+      
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: error.message || 'Erreur lors de la création de l\'événement',
+        timestamp: new Date().toISOString()
+      });
+      
+      return false;
+    } finally {
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'events', loading: false } });
+    }
   };
 
   // WebSocket functions
@@ -913,6 +988,23 @@ export function SecureAppProvider({ children }) {
     return await notificationService.requestNotificationPermission();
   };
 
+  // Update user profile
+  const updateProfile = async (profileData) => {
+    try {
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'profile', loading: true } });
+      
+      const updatedUser = await SecureApiService.updateProfile(profileData);
+      dispatch({ type: 'UPDATE_PROFILE', payload: updatedUser });
+      
+      return updatedUser;
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    } finally {
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'profile', loading: false } });
+    }
+  };
+
   const value = {
     ...state,
     USER_TYPES,
@@ -933,6 +1025,7 @@ export function SecureAppProvider({ children }) {
     markMessagesAsRead: markMessagesAsReadViaWebSocket,
     applyToOpportunity,
     createOpportunity,
+    createEvent,
     updateProfile,
     loadUsers,
     getFilteredUsers,

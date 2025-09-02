@@ -11,7 +11,7 @@ class WebSocketService {
       return;
     }
 
-    this.socket = io('http://localhost:3005', {
+    this.socket = io('http://localhost:3002', {
       auth: {
         token: token
       },

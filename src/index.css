@@ -7,6 +7,11 @@
     scroll-behavior: smooth;
   }
   
+  /* Landing page specific styles */
+  .landing-page {
+    scroll-behavior: smooth;
+  }
+  
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
   }
@@ -65,8 +70,23 @@
     @apply bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800;
   }
   
+  .cipme-gradient {
+    background: linear-gradient(135deg, #FF7A00 0%, #ea580c 50%, #c2410c 100%);
+  }
+  
+  .cipme-gradient-hero {
+    background: linear-gradient(135deg, #FF7A00 0%, #fb923c 25%, #ea580c 75%, #c2410c 100%);
+  }
+  
   .text-gradient {
     @apply bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent;
+  }
+  
+  .cipme-text-gradient {
+    background: linear-gradient(135deg, #FF7A00 0%, #ea580c 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
   
   .nav-item {
@@ -90,7 +110,22 @@
   }
   
   .modal-content {
-    @apply bg-white rounded-xl shadow-xl max-w-lg w-full max-h-screen overflow-auto;
+    @apply bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full max-h-screen overflow-auto relative z-50;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 }
 
@@ -144,4 +179,8 @@
 
 .dark .input-field {
   @apply bg-gray-800 border-gray-600 text-gray-100;
+}
+
+.dark .modal-content {
+  @apply bg-gray-800 border border-gray-700;
 }

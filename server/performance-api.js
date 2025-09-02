@@ -172,6 +172,13 @@ router.get('/dashboard', (req, res) => {
   res.send(dashboardHtml);
 });
 
+// Public performance dashboard (no authentication required)
+router.get('/public-dashboard', (req, res) => {
+  const dashboardHtml = generatePerformanceDashboard();
+  res.set('Content-Type', 'text/html');
+  res.send(dashboardHtml);
+});
+
 function generatePerformanceDashboard() {
   return `
 <!DOCTYPE html>
@@ -519,5 +526,6 @@ module.exports = {
   router,
   performanceMonitor,
   performanceMiddleware,
-  createDatabaseQueryWrapper
+  createDatabaseQueryWrapper,
+  generatePerformanceDashboard
 };

@@ -1,5 +1,5 @@
 // Secure API service layer for PME2GO with JWT authentication
-const API_BASE_URL = process.env.REACT_APP_SECURE_API_URL || 'http://localhost:3004/api';
+const API_BASE_URL = process.env.REACT_APP_SECURE_API_URL || 'http://localhost:3002/api';
 
 class SecureApiService {
   constructor() {
@@ -244,6 +244,11 @@ class SecureApiService {
     }
   }
 
+  // Get stored token for WebSocket
+  getStoredToken() {
+    return this.accessToken;
+  }
+
   // Health Check
   async healthCheck() {
     try {
@@ -270,9 +275,13 @@ class SecureApiService {
   }
 
   async updateProfile(userData) {
+    // Add current user's ID to the request
+    const currentUser = this.getCurrentUser();
+    const updatedData = { ...userData, userId: currentUser?.id };
+    
     return await this.request('/users/profile', {
       method: 'PUT',
-      body: userData,
+      body: updatedData,
     });
   }
 
@@ -292,9 +301,11 @@ class SecureApiService {
     return [];
   }
 
-  async sendMessage(senderId, receiverId, content) {
-    // For now, return success - will implement when messages endpoint is added to secure server
-    return { success: true };
+  async sendMessage(receiverId, content) {
+    return await this.request('/messages', {
+      method: 'POST',
+      body: { receiverId, content },
+    });
   }
 
   async markMessagesAsRead(userId, senderId) {
@@ -328,13 +339,22 @@ class SecureApiService {
   }
 
   async createOpportunity(opportunityData) {
-    // For now, return success - will implement when opportunities endpoint is added to secure server
-    return { success: true };
+    return await this.request('/opportunities', {
+      method: 'POST',
+      body: opportunityData,
+    });
   }
 
   async applyToOpportunity(opportunityId, userId, applicationData = {}) {
     // For now, return success - will implement when applications endpoint is added to secure server
     return { success: true };
+  }
+
+  async createEvent(eventData) {
+    return await this.request('/events', {
+      method: 'POST',
+      body: eventData,
+    });
   }
 
   async registerForEvent(eventId, userId) {

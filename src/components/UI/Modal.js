@@ -42,7 +42,7 @@ export function Modal({
     <div className="modal">
       {/* Overlay */}
       <div 
-        className="overlay backdrop-blur-sm"
+        className="overlay"
         onClick={closeOnOverlay ? onClose : undefined}
       />
       

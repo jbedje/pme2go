@@ -1,5 +1,5 @@
 // API service layer for PME2GO
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3004/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3002/api';
 
 class ApiService {
   constructor() {

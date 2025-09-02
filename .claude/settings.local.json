@@ -27,7 +27,20 @@
       "Bash(chmod:*)",
       "Bash(mv:*)",
       "Bash(./scripts/github-setup.sh:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git remote add:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(npm run dev:*)",
+      "Bash(taskkill:*)",
+      "Bash(npm run start:*)",
+      "Bash(set SERVER_PORT=3003)",
+      "Bash(tasklist:*)",
+      "Bash(wmic process where:*)",
+      "Bash(start debug-app-state.html)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []
