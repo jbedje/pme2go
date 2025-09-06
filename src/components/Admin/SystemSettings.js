@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSecureApp } from '../../contexts/SecureAppContext';
 import adminApi from '../../services/adminApi';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
@@ -15,23 +15,22 @@ function SystemSettings({ isSuperAdmin, onLoading }) {
     try {
       setLoading(true);
       setError(null);
-      onLoading?.(true);
       
       const data = await adminApi.getSystemSettings();
-      setSettings(data.settings);
+      setSettings(data || []);
       // Initialize edited settings with current values
       const initialEdited = {};
-      data.settings.forEach(setting => {
-        initialEdited[setting.key] = setting.value;
-      });
+      if (data && Array.isArray(data)) {
+        data.forEach(setting => {
+          initialEdited[setting.key] = setting.value;
+        });
+      }
       setEditedSettings(initialEdited);
     } catch (error) {
       console.error('Error fetching system settings:', error);
       setError(error.message);
-      addNotification('Failed to load system settings', 'error');
     } finally {
       setLoading(false);
-      onLoading?.(false);
     }
   };
 
@@ -68,6 +67,9 @@ function SystemSettings({ isSuperAdmin, onLoading }) {
   };
 
   const hasChanges = () => {
+    if (!settings || !Array.isArray(settings)) {
+      return false;
+    }
     return settings.some(setting => 
       JSON.stringify(setting.value) !== JSON.stringify(editedSettings[setting.key])
     );
@@ -75,9 +77,11 @@ function SystemSettings({ isSuperAdmin, onLoading }) {
 
   const resetChanges = () => {
     const initialEdited = {};
-    settings.forEach(setting => {
-      initialEdited[setting.key] = setting.value;
-    });
+    if (settings && Array.isArray(settings)) {
+      settings.forEach(setting => {
+        initialEdited[setting.key] = setting.value;
+      });
+    }
     setEditedSettings(initialEdited);
   };
 
@@ -352,7 +356,7 @@ function SystemSettings({ isSuperAdmin, onLoading }) {
 
       {/* Settings List */}
       <div className="space-y-6">
-        {settings.map((setting) => (
+        {(settings || []).map((setting) => (
           <div key={setting.key} className="bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 p-6">
             <div className="mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">

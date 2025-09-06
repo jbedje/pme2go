@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useSecureApp } from '../../contexts/SecureAppContext';
 import adminApi from '../../services/adminApi';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 
 function ActivityLogs({ onLoading }) {
-  const { addNotification } = useSecureApp();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -21,31 +19,58 @@ function ActivityLogs({ onLoading }) {
     try {
       setLoading(true);
       setError(null);
-      onLoading?.(true);
       
       const data = await adminApi.getActivityLogs(filters);
-      setLogs(data.logs.map(log => adminApi.formatActivityLog(log)));
-      setPagination(data.pagination);
+      if (data && data.logs) {
+        setLogs(data.logs.map(log => adminApi.formatActivityLog(log)));
+        setPagination(data.pagination || {});
+      } else {
+        setLogs(data || []);
+        setPagination({});
+      }
     } catch (error) {
       console.error('Error fetching activity logs:', error);
       setError(error.message);
-      addNotification('Failed to load activity logs', 'error');
     } finally {
       setLoading(false);
-      onLoading?.(false);
     }
   };
 
   useEffect(() => {
     fetchLogs();
-  }, [filters]);
+  }, []);
 
   const handleFilterChange = (key, value) => {
-    setFilters(prev => ({
-      ...prev,
+    const newFilters = {
+      ...filters,
       [key]: value,
       page: key !== 'page' ? 1 : value // Reset to page 1 when changing filters
-    }));
+    };
+    setFilters(newFilters);
+    
+    // Use the new filters directly for the API call
+    const fetchWithNewFilters = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const data = await adminApi.getActivityLogs(newFilters);
+        if (data && data.logs) {
+          setLogs(data.logs.map(log => adminApi.formatActivityLog(log)));
+          setPagination(data.pagination || {});
+        } else {
+          setLogs(data || []);
+          setPagination({});
+        }
+      } catch (error) {
+        console.error('Error fetching activity logs:', error);
+        setError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchWithNewFilters();
   };
 
   const getActionBadgeColor = (action) => {

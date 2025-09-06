@@ -625,12 +625,68 @@ app.get('/api/admin/logs', (req, res) => {
 });
 
 app.get('/api/admin/settings', (req, res) => {
-  res.json({
-    maintenance_mode: false,
-    registration_enabled: true,
-    email_notifications: true,
-    max_file_size: 10485760, // 10MB
-    session_timeout: 3600 // 1 hour
+  console.log('🔧 ADMIN SETTINGS GET ENDPOINT CALLED');
+  // Return settings in the format expected by SystemSettings component
+  const settings = [
+    {
+      key: 'maintenance_mode',
+      label: 'Maintenance Mode',
+      value: { enabled: false, message: 'System is under maintenance. Please try again later.' },
+      type: 'object',
+      description: 'Enable maintenance mode to temporarily disable the platform',
+      updated_at: new Date().toISOString()
+    },
+    {
+      key: 'user_registration',
+      label: 'User Registration',
+      value: { enabled: true, require_verification: true },
+      type: 'object',
+      description: 'Control user registration settings',
+      updated_at: new Date().toISOString()
+    },
+    {
+      key: 'rate_limits',
+      label: 'Rate Limits',
+      value: { auth_attempts: 5, general_requests: 100, window_minutes: 15 },
+      type: 'object', 
+      description: 'API rate limiting configuration',
+      updated_at: new Date().toISOString()
+    },
+    {
+      key: 'notifications',
+      label: 'Notifications',
+      value: { email_enabled: true, push_enabled: false },
+      type: 'object',
+      description: 'Notification system settings',
+      updated_at: new Date().toISOString()
+    }
+  ];
+  
+  res.json(settings);
+});
+
+// PUT /api/admin/settings - Update system settings
+app.put('/api/admin/settings', (req, res) => {
+  console.log('🔧 ADMIN SETTINGS UPDATE ENDPOINT CALLED');
+  
+  const { settings } = req.body;
+  
+  if (!settings || !Array.isArray(settings)) {
+    return res.status(400).json({ error: 'Invalid settings format. Expected array.' });
+  }
+  
+  console.log('📝 Settings to update:', settings.length, 'items');
+  
+  // In a real app, you would update the settings in the database
+  // For now, we'll just return success with the updated settings
+  const updatedSettings = settings.map(setting => ({
+    ...setting,
+    updated_at: new Date().toISOString()
+  }));
+  
+  res.json({ 
+    message: 'Settings updated successfully',
+    settings: updatedSettings
   });
 });
 
@@ -675,6 +731,10 @@ app.post('/api/auth/login', async (req, res) => {
       // Remove password from response
       const { password_hash, ...userWithoutPassword } = user;
       
+      // Generate tokens for authentication
+      const accessToken = Buffer.from(`${user.uuid}:${Date.now()}`).toString('base64');
+      const refreshToken = Buffer.from(`${user.uuid}:refresh:${Date.now()}`).toString('base64');
+      
       res.json({
         success: true,
         user: {
@@ -682,6 +742,10 @@ app.post('/api/auth/login', async (req, res) => {
           id: user.uuid, // Use UUID as frontend ID
           stats: user.stats || {},
           profile_data: user.profile_data || {}
+        },
+        tokens: {
+          accessToken,
+          refreshToken
         }
       });
     } catch (error) {
@@ -694,9 +758,18 @@ app.post('/api/auth/login', async (req, res) => {
     
     if (user) {
       console.log(`✅ Demo login successful for ${email}`);
+      
+      // Generate tokens for demo authentication
+      const accessToken = Buffer.from(`${user.id}:${Date.now()}`).toString('base64');
+      const refreshToken = Buffer.from(`${user.id}:refresh:${Date.now()}`).toString('base64');
+      
       res.json({
         success: true,
-        user: user
+        user: user,
+        tokens: {
+          accessToken,
+          refreshToken
+        }
       });
     } else {
       console.log(`❌ Demo login failed for ${email} - user not found`);
@@ -859,17 +932,270 @@ app.post('/api/opportunities', async (req, res) => {
   try {
     const { title, type, company, industry, location, budget, duration, description, requirements, tags, deadline, authorId } = req.body;
     
-    const uuid = Date.now().toString();
-    
-    const result = await pool.query(`
-      INSERT INTO opportunities (uuid, title, type, author_id, company, industry, location, budget, duration, description, requirements, tags, deadline)
-      VALUES ($1, $2, $3, (SELECT id FROM users WHERE uuid = $4), $5, $6, $7, $8, $9, $10, $11, $12, $13)
-      RETURNING uuid as id, *
-    `, [uuid, title, type, authorId, company, industry, location, budget, duration, description, requirements, tags, deadline]);
-    
-    res.json(result.rows[0]);
+    if (isDatabaseConnected) {
+      const uuid = Date.now().toString();
+      
+      const result = await pool.query(`
+        INSERT INTO opportunities (uuid, title, type, author_id, company, industry, location, budget, duration, description, requirements, tags, deadline)
+        VALUES ($1, $2, $3, (SELECT id FROM users WHERE uuid = $4), $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        RETURNING uuid as id, title, type, company, industry, location, budget, duration, description, requirements, tags, deadline, status, applicants, created_at
+      `, [uuid, title, type, authorId, company, industry, location, budget, duration, description, requirements, tags, deadline]);
+      
+      console.log('✅ Created opportunity:', result.rows[0]);
+      res.json(result.rows[0]);
+    } else {
+      // Demo mode - return mock created opportunity
+      const mockOpportunity = {
+        id: Date.now().toString(),
+        title,
+        type,
+        company,
+        industry,
+        location,
+        budget,
+        duration,
+        description,
+        requirements: Array.isArray(requirements) ? requirements : requirements?.split(',').map(r => r.trim()) || [],
+        tags: Array.isArray(tags) ? tags : tags?.split(',').map(t => t.trim()) || [],
+        deadline,
+        status: 'Ouvert',
+        applicants: 0,
+        createdAt: new Date().toISOString(),
+        authorId
+      };
+      
+      console.log('✅ Created opportunity (demo mode):', mockOpportunity);
+      res.json(mockOpportunity);
+    }
   } catch (error) {
     console.error('Create opportunity error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Get single opportunity by ID
+app.get('/api/opportunities/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (isDatabaseConnected) {
+      const result = await pool.query(`
+        SELECT o.uuid as id, o.title, o.type, o.company, o.industry, o.location,
+               o.budget, o.duration, o.description, o.requirements, o.tags,
+               o.deadline, o.applicants, o.status, o.created_at,
+               u.name as author_name, u.uuid as author_id
+        FROM opportunities o
+        JOIN users u ON o.author_id = u.id
+        WHERE o.uuid = $1
+      `, [id]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Opportunité introuvable' });
+      }
+      
+      res.json(result.rows[0]);
+    } else {
+      // Demo mode - find in demoOpportunities
+      const opportunity = demoOpportunities.find(opp => opp.id === id);
+      if (!opportunity) {
+        return res.status(404).json({ error: 'Opportunité introuvable' });
+      }
+      res.json(opportunity);
+    }
+  } catch (error) {
+    console.error('Get opportunity error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Update opportunity
+app.put('/api/opportunities/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, type, company, industry, location, budget, duration, description, requirements, tags, deadline, status } = req.body;
+    
+    if (isDatabaseConnected) {
+      const result = await pool.query(`
+        UPDATE opportunities SET 
+          title = $2, type = $3, company = $4, industry = $5, location = $6,
+          budget = $7, duration = $8, description = $9, requirements = $10, 
+          tags = $11, deadline = $12, status = $13, updated_at = CURRENT_TIMESTAMP
+        WHERE uuid = $1
+        RETURNING uuid as id, title, type, company, industry, location, budget, duration, description, requirements, tags, deadline, status, applicants, created_at, updated_at
+      `, [id, title, type, company, industry, location, budget, duration, description, requirements, tags, deadline, status]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Opportunité introuvable' });
+      }
+      
+      console.log('✅ Updated opportunity:', result.rows[0]);
+      res.json(result.rows[0]);
+    } else {
+      // Demo mode
+      const updatedOpportunity = {
+        id,
+        title,
+        type,
+        company,
+        industry,
+        location,
+        budget,
+        duration,
+        description,
+        requirements: Array.isArray(requirements) ? requirements : requirements?.split(',').map(r => r.trim()) || [],
+        tags: Array.isArray(tags) ? tags : tags?.split(',').map(t => t.trim()) || [],
+        deadline,
+        status: status || 'Ouvert',
+        updatedAt: new Date().toISOString()
+      };
+      
+      console.log('✅ Updated opportunity (demo mode):', updatedOpportunity);
+      res.json(updatedOpportunity);
+    }
+  } catch (error) {
+    console.error('Update opportunity error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Delete opportunity
+app.delete('/api/opportunities/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (isDatabaseConnected) {
+      const result = await pool.query(`
+        DELETE FROM opportunities WHERE uuid = $1
+        RETURNING uuid as id, title
+      `, [id]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Opportunité introuvable' });
+      }
+      
+      console.log('✅ Deleted opportunity:', result.rows[0]);
+      res.json({ success: true, message: 'Opportunité supprimée avec succès' });
+    } else {
+      // Demo mode
+      console.log('✅ Deleted opportunity (demo mode):', id);
+      res.json({ success: true, message: 'Opportunité supprimée avec succès' });
+    }
+  } catch (error) {
+    console.error('Delete opportunity error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Get opportunities by author (user's own opportunities)
+app.get('/api/opportunities/author/:authorId', async (req, res) => {
+  try {
+    const { authorId } = req.params;
+    
+    if (isDatabaseConnected) {
+      const result = await pool.query(`
+        SELECT o.uuid as id, o.title, o.type, o.company, o.industry, o.location,
+               o.budget, o.duration, o.description, o.requirements, o.tags,
+               o.deadline, o.applicants, o.status, o.created_at,
+               u.name as author_name, u.uuid as author_id
+        FROM opportunities o
+        JOIN users u ON o.author_id = u.id
+        WHERE u.uuid = $1
+        ORDER BY o.created_at DESC
+      `, [authorId]);
+      
+      res.json(result.rows);
+    } else {
+      // Demo mode - filter by author
+      const userOpportunities = demoOpportunities.filter(opp => opp.authorId === authorId);
+      res.json(userOpportunities);
+    }
+  } catch (error) {
+    console.error('Get user opportunities error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Applications endpoints
+app.post('/api/opportunities/:id/apply', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId, message } = req.body;
+    
+    if (isDatabaseConnected) {
+      // Check if already applied
+      const existingApplication = await pool.query(`
+        SELECT id FROM applications 
+        WHERE opportunity_id = (SELECT id FROM opportunities WHERE uuid = $1)
+        AND user_id = (SELECT id FROM users WHERE uuid = $2)
+      `, [id, userId]);
+      
+      if (existingApplication.rows.length > 0) {
+        return res.status(400).json({ error: 'Vous avez déjà candidaté à cette opportunité' });
+      }
+      
+      const applicationUuid = Date.now().toString();
+      
+      // Create application
+      await pool.query(`
+        INSERT INTO applications (uuid, opportunity_id, user_id, cover_letter)
+        VALUES ($1, (SELECT id FROM opportunities WHERE uuid = $2), (SELECT id FROM users WHERE uuid = $3), $4)
+      `, [applicationUuid, id, userId, message]);
+      
+      // Increment applicants count
+      await pool.query(`
+        UPDATE opportunities SET applicants = applicants + 1 
+        WHERE uuid = $1
+      `, [id]);
+      
+      console.log('✅ Application submitted for opportunity:', id);
+      res.json({ success: true, message: 'Candidature envoyée avec succès' });
+    } else {
+      // Demo mode
+      console.log('✅ Application submitted (demo mode) for opportunity:', id);
+      res.json({ success: true, message: 'Candidature envoyée avec succès' });
+    }
+  } catch (error) {
+    console.error('Apply to opportunity error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Get applications for an opportunity (for opportunity owner)
+app.get('/api/opportunities/:id/applications', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (isDatabaseConnected) {
+      const result = await pool.query(`
+        SELECT app.uuid as id, app.cover_letter as message, app.status, app.created_at,
+               u.uuid as applicant_id, u.name as applicant_name, u.type as applicant_type,
+               u.email as applicant_email, u.stats, u.profile_data
+        FROM applications app
+        JOIN opportunities o ON app.opportunity_id = o.id
+        JOIN users u ON app.user_id = u.id
+        WHERE o.uuid = $1
+        ORDER BY app.created_at DESC
+      `, [id]);
+      
+      res.json(result.rows);
+    } else {
+      // Demo mode - return mock applications
+      const mockApplications = [
+        {
+          id: '1',
+          message: 'Je suis très intéressé par cette opportunité...',
+          status: 'En attente',
+          created_at: new Date().toISOString(),
+          applicant_id: 'user2',
+          applicant_name: 'Marie Dubois',
+          applicant_type: 'Expert/Consultant',
+          applicant_email: 'marie.dubois@consulting.fr'
+        }
+      ];
+      res.json(mockApplications);
+    }
+  } catch (error) {
+    console.error('Get opportunity applications error:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -882,8 +1208,8 @@ app.get('/api/messages/:userId', async (req, res) => {
     
     let query = `
       SELECT m.uuid as id, m.content, m.read_status as read, m.created_at as timestamp,
-             sender.uuid as senderId, receiver.uuid as receiverId,
-             sender.name as senderName, receiver.name as receiverName
+             sender.uuid as "senderId", receiver.uuid as "receiverId",
+             sender.name as "senderName", receiver.name as "receiverName"
       FROM messages m
       JOIN users sender ON m.sender_id = sender.id
       JOIN users receiver ON m.receiver_id = receiver.id
@@ -953,7 +1279,378 @@ app.get('/api/events', async (req, res) => {
   }
 });
 
-// Favorites routes
+// POST - Create new event
+app.post('/api/events', async (req, res) => {
+  try {
+    const { title, type, eventDate, location, description, price, tags, organizer } = req.body;
+    console.log('➕ Create event:', { title, type, eventDate, location, description, price, tags, organizer });
+    
+    if (isDatabaseConnected) {
+      const eventUuid = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+      
+      // Handle tags array properly
+      let tagsArray = [];
+      if (tags) {
+        if (Array.isArray(tags)) {
+          tagsArray = tags;
+        } else if (typeof tags === 'string') {
+          tagsArray = tags.split(',').map(t => t.trim());
+        }
+      }
+      
+      const result = await pool.query(`
+        INSERT INTO events (uuid, title, type, organizer, event_date, location, description, price, tags)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING uuid as id, title, type, organizer, event_date as date, location, description, attendees, price, tags, created_at
+      `, [eventUuid, title, type, organizer || 'PME2GO Community', eventDate, location, description, price || 'Gratuit', tagsArray]);
+      
+      console.log('✅ Event created with UUID:', eventUuid);
+      res.json(result.rows[0]);
+    } else {
+      // Demo mode
+      console.log('✅ Event created (demo mode)');
+      const mockEvent = {
+        id: Date.now().toString(),
+        title,
+        type,
+        organizer: organizer || 'PME2GO Community',
+        date: eventDate,
+        location,
+        description,
+        attendees: 0,
+        price: price || 'Gratuit',
+        tags: Array.isArray(tags) ? tags : (tags ? tags.split(',').map(t => t.trim()) : []),
+        created_at: new Date().toISOString()
+      };
+      res.json(mockEvent);
+    }
+  } catch (error) {
+    console.error('Create event error:', error.message);
+    console.error('Full error:', error);
+    res.status(500).json({ error: 'Erreur serveur: ' + error.message });
+  }
+});
+
+// GET - Get single event
+app.get('/api/events/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('🔍 Get event:', id);
+    
+    if (isDatabaseConnected) {
+      const result = await pool.query(`
+        SELECT uuid as id, title, type, organizer, event_date as date, location,
+               description, attendees, price, tags, created_at
+        FROM events
+        WHERE uuid = $1
+      `, [id]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Événement non trouvé' });
+      }
+      
+      console.log('✅ Event found:', result.rows[0].title);
+      res.json(result.rows[0]);
+    } else {
+      // Demo mode - find event in demo data
+      const demoEvent = demoEvents.find(e => e.id === id);
+      if (demoEvent) {
+        res.json(demoEvent);
+      } else {
+        res.status(404).json({ error: 'Événement non trouvé' });
+      }
+    }
+  } catch (error) {
+    console.error('Get event error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// PUT - Update event
+app.put('/api/events/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, type, eventDate, location, description, price, tags, organizer } = req.body;
+    console.log('🔄 Update event:', { id, title, type });
+    
+    if (isDatabaseConnected) {
+      const result = await pool.query(`
+        UPDATE events 
+        SET title = $2, type = $3, organizer = $4, event_date = $5, location = $6, 
+            description = $7, price = $8, tags = $9, updated_at = CURRENT_TIMESTAMP
+        WHERE uuid = $1
+        RETURNING uuid as id, title, type, organizer, event_date as date, location,
+                  description, attendees, price, tags, created_at
+      `, [id, title, type, organizer, eventDate, location, description, price, tags ? tags.split(',').map(t => t.trim()) : []]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Événement non trouvé' });
+      }
+      
+      console.log('✅ Event updated:', result.rows[0].title);
+      res.json(result.rows[0]);
+    } else {
+      // Demo mode
+      console.log('✅ Event updated (demo mode)');
+      res.json({ success: true, message: 'Événement mis à jour avec succès' });
+    }
+  } catch (error) {
+    console.error('Update event error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// DELETE - Delete event
+app.delete('/api/events/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('🗑️ Delete event:', id);
+    
+    if (isDatabaseConnected) {
+      const result = await pool.query('DELETE FROM events WHERE uuid = $1 RETURNING title', [id]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Événement non trouvé' });
+      }
+      
+      console.log('✅ Event deleted:', result.rows[0].title);
+      res.json({ success: true, message: 'Événement supprimé avec succès' });
+    } else {
+      // Demo mode
+      console.log('✅ Event deleted (demo mode)');
+      res.json({ success: true, message: 'Événement supprimé avec succès' });
+    }
+  } catch (error) {
+    console.error('Delete event error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Event Registration routes
+// POST - Register for event
+app.post('/api/events/:id/register', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+    console.log('📝 Register for event:', { eventId: id, userId });
+    
+    if (isDatabaseConnected) {
+      // Check if user exists and get internal ID
+      const userResult = await pool.query('SELECT id FROM users WHERE uuid = $1', [userId]);
+      if (userResult.rows.length === 0) {
+        return res.status(400).json({ error: 'Utilisateur non trouvé' });
+      }
+      const internalUserId = userResult.rows[0].id;
+      
+      // Check if event exists and get internal ID
+      const eventResult = await pool.query('SELECT id FROM events WHERE uuid = $1', [id]);
+      if (eventResult.rows.length === 0) {
+        return res.status(400).json({ error: 'Événement non trouvé' });
+      }
+      const internalEventId = eventResult.rows[0].id;
+      
+      // Check if already registered
+      const existingRegistration = await pool.query(`
+        SELECT id FROM event_registrations 
+        WHERE event_id = $1 AND user_id = $2
+      `, [internalEventId, internalUserId]);
+      
+      if (existingRegistration.rows.length > 0) {
+        return res.status(400).json({ error: 'Vous êtes déjà inscrit à cet événement' });
+      }
+      
+      // Create registration
+      await pool.query(`
+        INSERT INTO event_registrations (event_id, user_id)
+        VALUES ($1, $2)
+      `, [internalEventId, internalUserId]);
+      
+      // Update attendees count
+      await pool.query(`
+        UPDATE events SET attendees = attendees + 1 WHERE id = $1
+      `, [internalEventId]);
+      
+      console.log('✅ Event registration successful');
+      res.json({ success: true, message: 'Inscription réussie' });
+    } else {
+      // Demo mode
+      console.log('✅ Event registration (demo mode)');
+      res.json({ success: true, message: 'Inscription réussie' });
+    }
+  } catch (error) {
+    console.error('Event registration error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// DELETE - Unregister from event
+app.delete('/api/events/:id/register/:userId', async (req, res) => {
+  try {
+    const { id, userId } = req.params;
+    console.log('🚫 Unregister from event:', { eventId: id, userId });
+    
+    if (isDatabaseConnected) {
+      // Get internal IDs
+      const userResult = await pool.query('SELECT id FROM users WHERE uuid = $1', [userId]);
+      const eventResult = await pool.query('SELECT id FROM events WHERE uuid = $1', [id]);
+      
+      if (userResult.rows.length === 0 || eventResult.rows.length === 0) {
+        return res.status(400).json({ error: 'Utilisateur ou événement non trouvé' });
+      }
+      
+      const internalUserId = userResult.rows[0].id;
+      const internalEventId = eventResult.rows[0].id;
+      
+      // Remove registration
+      const result = await pool.query(`
+        DELETE FROM event_registrations 
+        WHERE event_id = $1 AND user_id = $2
+        RETURNING id
+      `, [internalEventId, internalUserId]);
+      
+      if (result.rows.length === 0) {
+        return res.status(400).json({ error: 'Inscription non trouvée' });
+      }
+      
+      // Update attendees count
+      await pool.query(`
+        UPDATE events SET attendees = GREATEST(attendees - 1, 0) WHERE id = $1
+      `, [internalEventId]);
+      
+      console.log('✅ Event unregistration successful');
+      res.json({ success: true, message: 'Désinscription réussie' });
+    } else {
+      // Demo mode
+      console.log('✅ Event unregistration (demo mode)');
+      res.json({ success: true, message: 'Désinscription réussie' });
+    }
+  } catch (error) {
+    console.error('Event unregistration error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET - Get user's event registrations
+app.get('/api/events/registrations/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    console.log('📋 Get user registrations:', userId);
+    
+    if (isDatabaseConnected) {
+      const result = await pool.query(`
+        SELECT e.uuid as id
+        FROM event_registrations er
+        JOIN users u ON er.user_id = u.id
+        JOIN events e ON er.event_id = e.id
+        WHERE u.uuid = $1
+        ORDER BY er.created_at DESC
+      `, [userId]);
+      
+      console.log('✅ User registrations retrieved:', userId, '- Count:', result.rows.length);
+      res.json({ registrations: result.rows.map(row => row.id) });
+    } else {
+      // Demo mode
+      console.log('✅ User registrations (demo mode):', userId);
+      res.json({ registrations: [] });
+    }
+  } catch (error) {
+    console.error('Get user registrations error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Opportunity Favorites routes
+app.get('/api/opportunity-favorites/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (isDatabaseConnected) {
+      const result = await pool.query(`
+        SELECT o.uuid as id
+        FROM opportunity_favorites f
+        JOIN users user_table ON f.user_id = user_table.id
+        JOIN opportunities o ON f.opportunity_id = o.id
+        WHERE user_table.uuid = $1
+        ORDER BY f.created_at DESC
+      `, [userId]);
+      
+      console.log('✅ Opportunity favorites retrieved for user:', userId, '- Count:', result.rows.length);
+      res.json({ favorites: result.rows.map(row => row.id) });
+    } else {
+      // Demo mode
+      console.log('✅ Opportunity favorites (demo mode) for user:', userId);
+      res.json({ favorites: [] });
+    }
+  } catch (error) {
+    console.error('Get opportunity favorites error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+app.post('/api/opportunity-favorites', async (req, res) => {
+  try {
+    const { user_id, opportunity_id } = req.body;
+    console.log('➕ Add opportunity favorite:', { user_id, opportunity_id });
+    
+    if (isDatabaseConnected) {
+      // Check if already favorited
+      const existing = await pool.query(`
+        SELECT id FROM opportunity_favorites 
+        WHERE user_id = (SELECT id FROM users WHERE uuid = $1)
+        AND opportunity_id = (SELECT id FROM opportunities WHERE uuid = $2)
+      `, [user_id, opportunity_id]);
+      
+      if (existing.rows.length > 0) {
+        return res.status(400).json({ error: 'Opportunité déjà dans vos favoris' });
+      }
+      
+      await pool.query(`
+        INSERT INTO opportunity_favorites (user_id, opportunity_id)
+        VALUES (
+          (SELECT id FROM users WHERE uuid = $1),
+          (SELECT id FROM opportunities WHERE uuid = $2)
+        )
+      `, [user_id, opportunity_id]);
+      
+      console.log('✅ Opportunity favorite added');
+      res.json({ success: true, message: 'Opportunité ajoutée aux favoris' });
+    } else {
+      // Demo mode
+      console.log('✅ Opportunity favorite added (demo mode)');
+      res.json({ success: true, message: 'Opportunité ajoutée aux favoris' });
+    }
+  } catch (error) {
+    console.error('Add opportunity favorite error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+app.delete('/api/opportunity-favorites/:userId/:opportunityId', async (req, res) => {
+  try {
+    const { userId, opportunityId } = req.params;
+    console.log('🗑️ Remove opportunity favorite:', { userId, opportunityId });
+    
+    if (isDatabaseConnected) {
+      const result = await pool.query(`
+        DELETE FROM opportunity_favorites 
+        WHERE user_id = (SELECT id FROM users WHERE uuid = $1)
+        AND opportunity_id = (SELECT id FROM opportunities WHERE uuid = $2)
+      `, [userId, opportunityId]);
+      
+      console.log('✅ Opportunity favorite removed');
+      res.json({ success: true, message: 'Opportunité retirée des favoris' });
+    } else {
+      // Demo mode
+      console.log('✅ Opportunity favorite removed (demo mode)');
+      res.json({ success: true, message: 'Opportunité retirée des favoris' });
+    }
+  } catch (error) {
+    console.error('Remove opportunity favorite error:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// User Favorites routes
 app.get('/api/favorites/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -1037,9 +1734,25 @@ const server = app.listen(PORT, async () => {
   console.log('  GET  /api/users');
   console.log('  GET  /api/opportunities');
   console.log('  POST /api/opportunities');
+  console.log('  GET  /api/opportunities/:id');
+  console.log('  PUT  /api/opportunities/:id');
+  console.log('  DELETE /api/opportunities/:id');
+  console.log('  GET  /api/opportunities/author/:authorId');
+  console.log('  POST /api/opportunities/:id/apply');
+  console.log('  GET  /api/opportunities/:id/applications');
   console.log('  GET  /api/messages/:userId');
   console.log('  POST /api/messages');
   console.log('  GET  /api/events');
+  console.log('  POST /api/events');
+  console.log('  GET  /api/events/:id');
+  console.log('  PUT  /api/events/:id');
+  console.log('  DELETE /api/events/:id');
+  console.log('  POST /api/events/:id/register');
+  console.log('  DELETE /api/events/:id/register/:userId');
+  console.log('  GET  /api/events/registrations/:userId');
+  console.log('  GET  /api/opportunity-favorites/:userId');
+  console.log('  POST /api/opportunity-favorites');
+  console.log('  DELETE /api/opportunity-favorites/:userId/:opportunityId');
   console.log('  GET  /api/favorites/:userId');
   console.log('  POST /api/favorites');
   console.log('🎯 Server ready and listening...');

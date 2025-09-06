@@ -118,11 +118,11 @@ class AdminApiService {
   }
 
   async getSystemSettings() {
-    return await this.request('/admin/system/settings');
+    return await this.request('/admin/settings');
   }
 
   async updateSystemSettings(settings) {
-    return await this.request('/admin/system/settings', {
+    return await this.request('/admin/settings', {
       method: 'PUT',
       body: { settings },
     });

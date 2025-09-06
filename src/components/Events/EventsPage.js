@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   MapPin, 
@@ -12,20 +12,37 @@ import {
   Heart,
   Share2,
   Video,
-  X
+  X,
+  Edit,
+  Trash2,
+  UserPlus,
+  UserMinus
 } from 'lucide-react';
 import { useSecureApp } from '../../contexts/SecureAppContext';
 import { EventCard } from '../UI/Card';
 import { Modal } from '../UI/Modal';
 
 export default function EventsPage() {
-  const { events, user, addNotification, createEvent } = useSecureApp();
+  const { 
+    events, 
+    user, 
+    eventRegistrations,
+    addNotification, 
+    createEvent,
+    updateEvent,
+    deleteEvent,
+    registerForEvent,
+    unregisterFromEvent,
+    isRegisteredForEvent,
+    loadEventRegistrations
+  } = useSecureApp();
   const [showFilters, setShowFilters] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
-  const [registeredEvents, setRegisteredEvents] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
   
   const [newEvent, setNewEvent] = useState({
     title: '',
@@ -47,6 +64,75 @@ export default function EventsPage() {
     { key: 'free', label: 'Gratuits' },
     { key: 'online', label: 'En ligne' }
   ];
+
+  // Load event registrations when user is available
+  useEffect(() => {
+    if (user?.id) {
+      loadEventRegistrations(user.id);
+    }
+  }, [user?.id]);
+
+  // Event management functions
+  const handleEditEvent = (event) => {
+    setEditingEvent(event);
+    setNewEvent({
+      title: event.title,
+      type: event.type,
+      eventDate: event.date,
+      location: event.location,
+      description: event.description,
+      price: event.price,
+      tags: Array.isArray(event.tags) ? event.tags.join(', ') : event.tags || '',
+      organizer: event.organizer
+    });
+    setShowEditModal(true);
+  };
+
+  const handleDeleteEvent = async (eventId) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer cet événement ?')) {
+      const success = await deleteEvent(eventId);
+      if (success) {
+        setSelectedEvent(null);
+      }
+    }
+  };
+
+  const handleUpdateEvent = async (e) => {
+    e.preventDefault();
+    
+    const success = await updateEvent(editingEvent.id, {
+      ...newEvent,
+      eventDate: newEvent.eventDate
+    });
+    
+    if (success) {
+      setShowEditModal(false);
+      setEditingEvent(null);
+      setNewEvent({
+        title: '',
+        type: 'Workshop',
+        eventDate: '',
+        location: '',
+        description: '',
+        price: 'Gratuit',
+        tags: ''
+      });
+    }
+  };
+
+  const handleRegisterEvent = async (eventId) => {
+    const success = await registerForEvent(eventId);
+    if (success) {
+      setSelectedEvent(null);
+    }
+  };
+
+  const handleUnregisterEvent = async (eventId) => {
+    const success = await unregisterFromEvent(eventId);
+    if (success) {
+      setSelectedEvent(null);
+    }
+  };
 
   const getFilteredEvents = () => {
     let filtered = events;
@@ -94,15 +180,17 @@ export default function EventsPage() {
 
   const filteredEvents = getFilteredEvents();
 
-  const handleRegisterToEvent = (eventId) => {
-    if (!registeredEvents.includes(eventId)) {
-      setRegisteredEvents(prev => [...prev, eventId]);
-      addNotification({
-        id: Date.now().toString(),
-        type: 'success',
-        message: 'Inscription à l\'événement confirmée !',
-        timestamp: new Date().toISOString()
-      });
+  const handleRegisterToEvent = async (eventId) => {
+    if (!isRegisteredForEvent(eventId)) {
+      const success = await registerForEvent(eventId);
+      if (success) {
+        addNotification({
+          id: Date.now().toString(),
+          type: 'success',
+          message: 'Inscription à l\'événement confirmée !',
+          timestamp: new Date().toISOString()
+        });
+      }
     }
     setSelectedEvent(null);
   };
@@ -288,7 +376,7 @@ export default function EventsPage() {
             </div>
             <div>
               <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {registeredEvents.length}
+                {eventRegistrations.length}
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 Mes inscriptions
@@ -316,7 +404,7 @@ export default function EventsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {filteredEvents.map((event) => {
             const eventDate = formatEventDate(event.date);
-            const isRegistered = registeredEvents.includes(event.id);
+            const isRegistered = isRegisteredForEvent(event.id);
             
             return (
               <div key={event.id} className="card hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setSelectedEvent(event)}>
@@ -350,6 +438,32 @@ export default function EventsPage() {
                         </div>
                         
                         <div className="flex space-x-2">
+                          {/* Edit/Delete buttons for event organizer */}
+                          {user && (event.organizer === user.name || event.organizer_id === user.id) && (
+                            <>
+                              <button 
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  handleEditEvent(event);
+                                }}
+                                className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
+                                title="Modifier l'événement"
+                              >
+                                <Edit size={16} />
+                              </button>
+                              <button 
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  handleDeleteEvent(event.id);
+                                }}
+                                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                title="Supprimer l'événement"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </>
+                          )}
+                          
                           <button 
                             onClick={(e) => { e.stopPropagation(); }}
                             className="p-1 text-gray-400 hover:text-red-500 transition-colors"
@@ -525,6 +639,138 @@ export default function EventsPage() {
         </form>
       </Modal>
 
+      {/* Modal de modification d'événement */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingEvent(null);
+        }}
+        title="Modifier l'événement"
+        size="lg"
+      >
+        <form onSubmit={handleUpdateEvent} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Titre */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Titre de l'événement
+              </label>
+              <input
+                type="text"
+                required
+                value={newEvent.title}
+                onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                placeholder="Ex: Atelier Design Thinking"
+              />
+            </div>
+
+            {/* Type */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Type d'événement
+              </label>
+              <select
+                value={newEvent.type}
+                onChange={(e) => setNewEvent({...newEvent, type: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+              >
+                {eventTypes.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Date et heure */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Date et heure
+              </label>
+              <input
+                type="datetime-local"
+                required
+                value={newEvent.eventDate}
+                onChange={(e) => setNewEvent({...newEvent, eventDate: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+
+            {/* Lieu */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Lieu
+              </label>
+              <input
+                type="text"
+                value={newEvent.location}
+                onChange={(e) => setNewEvent({...newEvent, location: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                placeholder="Ex: Salle de conférence A, 123 Rue de la Paix"
+              />
+            </div>
+
+            {/* Prix */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Prix
+              </label>
+              <input
+                type="text"
+                value={newEvent.price}
+                onChange={(e) => setNewEvent({...newEvent, price: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                placeholder="Ex: Gratuit, 25€, 50€"
+              />
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Tags (séparés par des virgules)
+              </label>
+              <input
+                type="text"
+                value={newEvent.tags}
+                onChange={(e) => setNewEvent({...newEvent, tags: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                placeholder="Ex: startup, innovation, networking"
+              />
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Description
+            </label>
+            <textarea
+              rows={4}
+              value={newEvent.description}
+              onChange={(e) => setNewEvent({...newEvent, description: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+              placeholder="Décrivez votre événement, les objectifs, le programme..."
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <button
+              type="button"
+              onClick={() => {
+                setShowEditModal(false);
+                setEditingEvent(null);
+              }}
+              className="btn-secondary"
+            >
+              Annuler
+            </button>
+            <button type="submit" className="btn-primary">
+              Mettre à jour
+            </button>
+          </div>
+        </form>
+      </Modal>
+
       {/* Modal de détail d'événement */}
       <Modal
         isOpen={!!selectedEvent}
@@ -545,7 +791,7 @@ export default function EventsPage() {
                 ) : (
                   <span className="badge-warning">{selectedEvent.price}</span>
                 )}
-                {registeredEvents.includes(selectedEvent.id) && (
+                {isRegisteredForEvent(selectedEvent.id) && (
                   <span className="badge-primary">Inscrit</span>
                 )}
               </div>
@@ -624,23 +870,23 @@ export default function EventsPage() {
                 </button>
               </div>
               
-              <button
-                onClick={() => handleRegisterToEvent(selectedEvent.id)}
-                disabled={registeredEvents.includes(selectedEvent.id)}
-                className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-colors ${
-                  registeredEvents.includes(selectedEvent.id)
-                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                    : 'btn-primary'
-                }`}
-              >
-                <Calendar size={18} />
-                <span>
-                  {registeredEvents.includes(selectedEvent.id) 
-                    ? 'Déjà inscrit' 
-                    : 'S\'inscrire'
-                  }
-                </span>
-              </button>
+              {isRegisteredForEvent(selectedEvent.id) ? (
+                <button
+                  onClick={() => handleUnregisterEvent(selectedEvent.id)}
+                  className="flex items-center space-x-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  <UserMinus size={18} />
+                  <span>Se désinscrire</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleRegisterEvent(selectedEvent.id)}
+                  className="btn-primary flex items-center space-x-2 px-6 py-3"
+                >
+                  <UserPlus size={18} />
+                  <span>S'inscrire</span>
+                </button>
+              )}
             </div>
           </div>
         )}

@@ -14,6 +14,8 @@ import OpportunitiesPage from './components/Opportunities/OpportunitiesPage';
 import AnalyticsPage from './components/Analytics/AnalyticsPage';
 import EventsPage from './components/Events/EventsPage';
 import AdminDashboard from './components/Admin/AdminDashboard';
+import FavoritesPage from './components/Favorites/FavoritesPage';
+import SettingsPage from './components/Settings/SettingsPage';
 import { LoadingSpinner } from './components/UI/LoadingSpinner';
 
 // Composant NotificationToast pour afficher les notifications
@@ -113,9 +115,9 @@ function AuthenticatedLayout() {
       case 'events':
         return <EventsPage />;
       case 'favorites':
-        return <FavoritesPlaceholder />;
+        return <FavoritesPage />;
       case 'settings':
-        return <SettingsPlaceholder />;
+        return <SettingsPage />;
       case 'profile':
         return <ProfilePlaceholder />;
       case 'admin':
@@ -160,37 +162,7 @@ function EventsPlaceholder() {
   );
 }
 
-function FavoritesPlaceholder() {
-  return (
-    <div className="text-center py-12">
-      <div className="bg-red-100 dark:bg-red-900 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-        <span className="text-2xl">❤️</span>
-      </div>
-      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-        Mes Favoris
-      </h3>
-      <p className="text-gray-600 dark:text-gray-400">
-        Retrouvez ici tous vos profils et opportunités favoris.
-      </p>
-    </div>
-  );
-}
 
-function SettingsPlaceholder() {
-  return (
-    <div className="text-center py-12">
-      <div className="bg-gray-100 dark:bg-gray-800 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-        <span className="text-2xl">⚙️</span>
-      </div>
-      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-        Paramètres
-      </h3>
-      <p className="text-gray-600 dark:text-gray-400">
-        Configuration et préférences de votre compte.
-      </p>
-    </div>
-  );
-}
 
 function ProfilePlaceholder() {
   return (

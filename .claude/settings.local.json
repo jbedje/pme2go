@@ -40,7 +40,11 @@
       "Bash(tasklist:*)",
       "Bash(wmic process where:*)",
       "Bash(start debug-app-state.html)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(PGPASSWORD=Postgres2024! psql -U postgres -d \"pme-360-db\" -c \"\\dt\")",
+      "Bash(PGPASSWORD=Postgres2024! psql -U postgres -d \"pme-360-db\" -c \"\\d applications\")",
+      "Bash(PGPASSWORD=Postgres2024! psql:*)",
+      "Bash(set PORT=3003)"
     ],
     "deny": [],
     "ask": []

@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useSecureApp } from '../../contexts/SecureAppContext';
 import adminApi from '../../services/adminApi';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 
-function AdminStats({ onLoading }) {
-  const { addNotification } = useSecureApp();
+function AdminStats() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,17 +11,14 @@ function AdminStats({ onLoading }) {
     try {
       setLoading(true);
       setError(null);
-      onLoading?.(true);
       
       const data = await adminApi.getDashboardStats();
       setStats(data);
     } catch (error) {
       console.error('Error fetching admin stats:', error);
       setError(error.message);
-      addNotification('Failed to load dashboard statistics', 'error');
     } finally {
       setLoading(false);
-      onLoading?.(false);
     }
   };
 

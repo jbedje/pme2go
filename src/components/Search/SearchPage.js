@@ -60,51 +60,67 @@ export default function SearchPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
 
-  // Load available filters on component mount
+  // Load available filters and initial results on component mount
   useEffect(() => {
-    const loadFilters = async () => {
+    const loadInitialData = async () => {
       try {
+        // Load filters
         const filters = await searchApi.getFilters();
         setAvailableFilters(filters);
+        
+        // Load all users initially using simple API
+        setLoading(true);
+        const response = await fetch('http://localhost:3002/api/users');
+        const users = await response.json();
+        
+        setSearchResults(users || []);
+        setPagination({
+          page: 1,
+          limit: 20,
+          total: users?.length || 0,
+          totalPages: Math.ceil((users?.length || 0) / 20),
+          hasNext: false,
+          hasPrev: false
+        });
+        
       } catch (error) {
-        console.error('Failed to load search filters:', error);
+        console.error('Failed to load initial data:', error);
+        setError('Failed to load profiles. Please try again.');
+      } finally {
+        setLoading(false);
       }
     };
     
-    loadFilters();
+    loadInitialData();
   }, []);
 
   // Debounced search function
   const debouncedSearch = useCallback(
     debounce(async (query, filters, page = 1) => {
-      if (!query.trim() && Object.values(filters).every(v => 
-        Array.isArray(v) ? v.length === 0 : !v
-      )) {
-        setSearchResults([]);
-        setPagination(prev => ({ ...prev, total: 0, totalPages: 0 }));
-        return;
-      }
+      // Always perform search, even with empty query to show all results
 
       setLoading(true);
       setError(null);
 
       try {
-        const results = await searchApi.advancedSearch({
-          query,
-          selectedSkills: filters.skills,
-          selectedLanguages: filters.languages,
-          selectedCompany: filters.company,
-          selectedPosition: filters.position,
-          selectedAvailability: filters.availability,
-          selectedLocation: filters.location,
-          page,
-          pageSize: pagination.limit,
-          sortBy,
-          sortOrder
-        });
+        // Build query parameters for simple API
+        const params = new URLSearchParams();
+        if (query) params.append('keywords', query);
+        if (filters.company) params.append('industry', filters.company); // Map company to industry
+        if (filters.location) params.append('location', filters.location);
+        
+        const response = await fetch(`http://localhost:3002/api/users?${params.toString()}`);
+        const users = await response.json();
 
-        setSearchResults(results.users || []);
-        setPagination(results.pagination || {});
+        setSearchResults(users || []);
+        setPagination({
+          page,
+          limit: pagination.limit,
+          total: users?.length || 0,
+          totalPages: Math.ceil((users?.length || 0) / pagination.limit),
+          hasNext: false,
+          hasPrev: false
+        });
       } catch (error) {
         console.error('Search failed:', error);
         setError('Search failed. Please try again.');

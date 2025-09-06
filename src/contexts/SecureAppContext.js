@@ -27,8 +27,10 @@ const initialState = {
   notifications: [],
   users: [],
   opportunities: [],
+  opportunityFavorites: [],
   messages: [],
   events: [],
+  eventRegistrations: [],
   loading: false,
   loadingStates: {
     login: false,
@@ -94,6 +96,26 @@ function secureAppReducer(state, action) {
         ...state,
         opportunities: action.payload
       };
+
+    case 'SET_OPPORTUNITY_FAVORITES':
+      return {
+        ...state,
+        opportunityFavorites: action.payload
+      };
+
+    case 'ADD_OPPORTUNITY_FAVORITE':
+      return {
+        ...state,
+        opportunityFavorites: [...state.opportunityFavorites, action.payload]
+      };
+
+    case 'REMOVE_OPPORTUNITY_FAVORITE':
+      return {
+        ...state,
+        opportunityFavorites: state.opportunityFavorites.filter(
+          opportunityId => opportunityId !== action.payload
+        )
+      };
     
     case 'SET_MESSAGES':
       return {
@@ -105,6 +127,40 @@ function secureAppReducer(state, action) {
       return {
         ...state,
         events: action.payload
+      };
+
+    case 'UPDATE_EVENT':
+      return {
+        ...state,
+        events: state.events.map(event => 
+          event.id === action.payload.id ? action.payload : event
+        )
+      };
+
+    case 'DELETE_EVENT':
+      return {
+        ...state,
+        events: state.events.filter(event => event.id !== action.payload)
+      };
+
+    case 'SET_EVENT_REGISTRATIONS':
+      return {
+        ...state,
+        eventRegistrations: action.payload
+      };
+
+    case 'ADD_EVENT_REGISTRATION':
+      return {
+        ...state,
+        eventRegistrations: [...state.eventRegistrations, action.payload]
+      };
+
+    case 'REMOVE_EVENT_REGISTRATION':
+      return {
+        ...state,
+        eventRegistrations: state.eventRegistrations.filter(
+          eventId => eventId !== action.payload
+        )
       };
     
     case 'LOGIN':
@@ -239,6 +295,21 @@ function secureAppReducer(state, action) {
         opportunities: [action.payload, ...state.opportunities],
         myOpportunities: [action.payload.id, ...state.myOpportunities]
       };
+
+    case 'UPDATE_OPPORTUNITY':
+      return {
+        ...state,
+        opportunities: state.opportunities.map(opp => 
+          opp.id === action.payload.id ? action.payload : opp
+        )
+      };
+
+    case 'DELETE_OPPORTUNITY':
+      return {
+        ...state,
+        opportunities: state.opportunities.filter(opp => opp.id !== action.payload),
+        myOpportunities: state.myOpportunities.filter(id => id !== action.payload)
+      };
     
     case 'SEND_MESSAGE':
       const newMessage = {
@@ -361,8 +432,13 @@ export function SecureAppProvider({ children }) {
     const initializeApp = async () => {
       try {
         // Check if user is already authenticated
+        console.log('🔍 Checking authentication...');
         const savedUser = SecureApiService.getCurrentUser();
+        console.log('👤 Saved user:', savedUser);
+        console.log('🔐 Is authenticated:', SecureApiService.isAuthenticated());
+        
         if (savedUser && SecureApiService.isAuthenticated()) {
+          console.log('✅ User is authenticated, dispatching LOGIN');
           dispatch({ type: 'LOGIN', payload: savedUser });
           
           // Check if user is admin and redirect to admin dashboard
@@ -370,11 +446,13 @@ export function SecureAppProvider({ children }) {
             dispatch({ type: 'SET_VIEW', payload: 'admin' });
           }
           
+          console.log('📡 About to call loadInitialData...');
           await loadInitialData();
           
           // Initialize WebSocket for already authenticated user
           initializeWebSocket();
         } else {
+          console.log('❌ User not authenticated, showing landing page');
           // No authentication found - ensure landing page is shown
           dispatch({ type: 'SET_VIEW', payload: 'landing' });
         }
@@ -405,17 +483,78 @@ export function SecureAppProvider({ children }) {
   };
 
   const loadInitialData = async () => {
-    if (!SecureApiService.isAuthenticated()) return;
+    console.log('🚀 loadInitialData called');
+    console.log('🔐 isAuthenticated:', SecureApiService.isAuthenticated());
+    
+    if (!SecureApiService.isAuthenticated()) {
+      console.log('❌ Not authenticated, skipping loadInitialData');
+      return;
+    }
+
+    const currentUser = SecureApiService.getCurrentUser();
+    console.log('👤 Current user from SecureApi:', currentUser);
+    
+    if (!currentUser?.id) {
+      console.log('❌ No user ID found, skipping loadInitialData');
+      return;
+    }
 
     try {
       dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'users', loading: true } });
       
       // Load users with pagination
+      console.log('👥 Loading users...');
       const usersResponse = await SecureApiService.getUsers();
-      dispatch({ type: 'SET_USERS', payload: usersResponse.users || [] });
+      console.log('👥 Users response:', usersResponse);
+      
+      // Handle both array response and object with users property
+      const users = Array.isArray(usersResponse) ? usersResponse : (usersResponse.users || []);
+      console.log('👥 Users array:', users.length, 'users');
+      dispatch({ type: 'SET_USERS', payload: users });
+
+      // Load user's favorites
+      console.log('🔍 Loading favorites for user:', currentUser.id);
+      const favorites = await SecureApiService.getFavorites(currentUser.id);
+      console.log('📋 Received favorites:', favorites);
+      const favoriteIds = favorites.map(fav => fav.profile_id || fav.id);
+      console.log('📋 Favorite IDs:', favoriteIds);
+      dispatch({ type: 'SET_FAVORITES', payload: favoriteIds });
+
+      // Load opportunities
+      console.log('💼 Loading opportunities...');
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'opportunities', loading: true } });
+      const opportunities = await SecureApiService.getOpportunities();
+      console.log('💼 Opportunities loaded:', opportunities.length, 'opportunities');
+      dispatch({ type: 'SET_OPPORTUNITIES', payload: opportunities });
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'opportunities', loading: false } });
+
+      // Load events
+      console.log('📅 Loading events...');
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'events', loading: true } });
+      const events = await SecureApiService.getEvents();
+      console.log('📅 Events loaded:', events.length, 'events');
+      dispatch({ type: 'SET_EVENTS', payload: events });
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'events', loading: false } });
+
+      // Load messages for current user
+      console.log('📨 Loading messages...');
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'messages', loading: true } });
+      try {
+        const messages = await SecureApiService.getMessages(currentUser.id);
+        console.log('📨 Messages loaded:', messages.length, 'messages');
+        dispatch({ type: 'SET_MESSAGES', payload: messages });
+      } catch (messagesError) {
+        console.error('Error loading messages:', messagesError);
+        // Continue with empty messages array
+        dispatch({ type: 'SET_MESSAGES', payload: [] });
+      }
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'messages', loading: false } });
       
     } catch (error) {
       console.error('Failed to load initial data:', error);
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'opportunities', loading: false } });
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'events', loading: false } });
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'messages', loading: false } });
       addNotification({
         id: Date.now().toString(),
         type: 'error',
@@ -435,6 +574,7 @@ export function SecureAppProvider({ children }) {
       const response = await SecureApiService.login(email, password);
       
       if (response.success) {
+        console.log('✅ Login successful, dispatching LOGIN');
         dispatch({ type: 'LOGIN', payload: response.user });
         
         // Check if user is admin and redirect to admin dashboard
@@ -442,6 +582,7 @@ export function SecureAppProvider({ children }) {
           dispatch({ type: 'SET_VIEW', payload: 'admin' });
         }
         
+        console.log('📡 Login - About to call loadInitialData...');
         await loadInitialData();
         
         // Initialize WebSocket connection
@@ -657,17 +798,69 @@ export function SecureAppProvider({ children }) {
     ).length;
   };
 
-  // Placeholder functions for features not yet implemented with secure API
+  // Favorites functionality with secure API
   const toggleFavorite = async (profileId) => {
-    // TODO: Implement when favorites endpoint is added to secure server
-    if (state.favoriteProfiles.includes(profileId)) {
-      dispatch({ type: 'REMOVE_FAVORITE', payload: profileId });
-    } else {
-      dispatch({ type: 'ADD_FAVORITE', payload: profileId });
+    console.log('💖 toggleFavorite called with profileId:', profileId);
+    console.log('👤 Current user:', state.user?.id);
+    console.log('📋 Current favorites:', state.favoriteProfiles);
+
+    if (!state.user?.id) {
       addNotification({
         id: Date.now().toString(),
-        type: 'success',
-        message: 'Profil ajouté aux favoris',
+        type: 'error',
+        message: 'Vous devez être connecté pour gérer les favoris',
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    try {
+      const isCurrentlyFavorite = state.favoriteProfiles.includes(profileId);
+      console.log('❤️ Is currently favorite:', isCurrentlyFavorite);
+      
+      let response;
+      if (isCurrentlyFavorite) {
+        console.log('➖ Removing from favorites...');
+        response = await SecureApiService.removeFavorite(state.user.id, profileId);
+        if (response.success) {
+          dispatch({ type: 'REMOVE_FAVORITE', payload: profileId });
+          addNotification({
+            id: Date.now().toString(),
+            type: 'success',
+            message: 'Profil retiré des favoris',
+            timestamp: new Date().toISOString()
+          });
+        }
+      } else {
+        console.log('➕ Adding to favorites...');
+        response = await SecureApiService.addFavorite(state.user.id, profileId);
+        if (response.success) {
+          dispatch({ type: 'ADD_FAVORITE', payload: profileId });
+          addNotification({
+            id: Date.now().toString(),
+            type: 'success',
+            message: 'Profil ajouté aux favoris',
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+
+      console.log('📊 Toggle favorite response:', response);
+
+      if (!response.success) {
+        addNotification({
+          id: Date.now().toString(),
+          type: 'error',
+          message: response.error || 'Erreur lors de la gestion des favoris',
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (error) {
+      console.error('❌ Toggle favorite error:', error);
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: 'Erreur lors de la gestion des favoris',
         timestamp: new Date().toISOString()
       });
     }
@@ -713,14 +906,36 @@ export function SecureAppProvider({ children }) {
     dispatch({ type: 'MARK_MESSAGES_READ', payload: senderId });
   };
 
-  const applyToOpportunity = (opportunityId) => {
-    dispatch({ type: 'APPLY_TO_OPPORTUNITY', payload: opportunityId });
-    addNotification({
-      id: Date.now().toString(),
-      type: 'success',
-      message: 'Candidature envoyée avec succès',
-      timestamp: new Date().toISOString()
-    });
+  const applyToOpportunity = async (opportunityId, message = '') => {
+    try {
+      console.log('📝 Context - applyToOpportunity called:', { opportunityId, message });
+      
+      const response = await SecureApiService.applyToOpportunity(opportunityId, state.user.id, message);
+      
+      if (response.success) {
+        dispatch({ type: 'APPLY_TO_OPPORTUNITY', payload: opportunityId });
+        addNotification({
+          id: Date.now().toString(),
+          type: 'success',
+          message: 'Candidature envoyée avec succès',
+          timestamp: new Date().toISOString()
+        });
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Apply to opportunity error:', error);
+      
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: error.message || 'Erreur lors de l\'envoi de la candidature',
+        timestamp: new Date().toISOString()
+      });
+      
+      return false;
+    }
   };
 
   const createOpportunity = async (opportunityData) => {
@@ -729,27 +944,23 @@ export function SecureAppProvider({ children }) {
       
       const response = await SecureApiService.createOpportunity(opportunityData);
       
-      if (response.success) {
-        const newOpportunity = {
-          id: response.opportunity.id,
-          ...opportunityData,
-          authorId: state.user.id,
-          createdAt: new Date().toISOString(),
-          applicants: 0
-        };
-        dispatch({ type: 'CREATE_OPPORTUNITY', payload: newOpportunity });
-        
-        addNotification({
-          id: Date.now().toString(),
-          type: 'success',
-          message: 'Opportunité publiée avec succès',
-          timestamp: new Date().toISOString()
-        });
-        
-        return true;
-      }
+      // The response should directly be the opportunity object, not wrapped in success
+      const newOpportunity = {
+        ...response,
+        authorId: state.user.id,
+        applicants: response.applicants || 0
+      };
       
-      return false;
+      dispatch({ type: 'CREATE_OPPORTUNITY', payload: newOpportunity });
+      
+      addNotification({
+        id: Date.now().toString(),
+        type: 'success',
+        message: 'Opportunité publiée avec succès',
+        timestamp: new Date().toISOString()
+      });
+      
+      return true;
     } catch (error) {
       console.error('Create opportunity error:', error);
       
@@ -764,6 +975,182 @@ export function SecureAppProvider({ children }) {
     } finally {
       dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'opportunities', loading: false } });
     }
+  };
+
+  const updateOpportunity = async (opportunityId, opportunityData) => {
+    try {
+      console.log('🔄 Context - updateOpportunity called:', { opportunityId, opportunityData });
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'opportunities', loading: true } });
+      
+      const response = await SecureApiService.updateOpportunity(opportunityId, opportunityData);
+      
+      dispatch({ type: 'UPDATE_OPPORTUNITY', payload: response });
+      
+      addNotification({
+        id: Date.now().toString(),
+        type: 'success',
+        message: 'Opportunité mise à jour avec succès',
+        timestamp: new Date().toISOString()
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Update opportunity error:', error);
+      
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: error.message || 'Erreur lors de la mise à jour de l\'opportunité',
+        timestamp: new Date().toISOString()
+      });
+      
+      return false;
+    } finally {
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'opportunities', loading: false } });
+    }
+  };
+
+  const deleteOpportunity = async (opportunityId) => {
+    try {
+      console.log('🗑️ Context - deleteOpportunity called:', opportunityId);
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'opportunities', loading: true } });
+      
+      await SecureApiService.deleteOpportunity(opportunityId);
+      
+      dispatch({ type: 'DELETE_OPPORTUNITY', payload: opportunityId });
+      
+      addNotification({
+        id: Date.now().toString(),
+        type: 'success',
+        message: 'Opportunité supprimée avec succès',
+        timestamp: new Date().toISOString()
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Delete opportunity error:', error);
+      
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: error.message || 'Erreur lors de la suppression de l\'opportunité',
+        timestamp: new Date().toISOString()
+      });
+      
+      return false;
+    } finally {
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'opportunities', loading: false } });
+    }
+  };
+
+  const getUserOpportunities = async (userId) => {
+    try {
+      console.log('🔍 Context - getUserOpportunities called:', userId);
+      const response = await SecureApiService.getUserOpportunities(userId);
+      return response;
+    } catch (error) {
+      console.error('Get user opportunities error:', error);
+      return [];
+    }
+  };
+
+  const getOpportunityApplications = async (opportunityId) => {
+    try {
+      console.log('🔍 Context - getOpportunityApplications called:', opportunityId);
+      const response = await SecureApiService.getOpportunityApplications(opportunityId);
+      return response;
+    } catch (error) {
+      console.error('Get opportunity applications error:', error);
+      return [];
+    }
+  };
+
+  const loadOpportunityFavorites = async (userId) => {
+    try {
+      console.log('📋 Context - loadOpportunityFavorites called:', userId);
+      const favorites = await SecureApiService.getOpportunityFavorites(userId);
+      dispatch({ type: 'SET_OPPORTUNITY_FAVORITES', payload: favorites });
+      return favorites;
+    } catch (error) {
+      console.error('Load opportunity favorites error:', error);
+      return [];
+    }
+  };
+
+  const addOpportunityToFavorites = async (opportunityId) => {
+    try {
+      console.log('➕ Context - addOpportunityToFavorites called:', opportunityId);
+      const response = await SecureApiService.addOpportunityFavorite(state.user.id, opportunityId);
+      
+      if (response.success) {
+        dispatch({ 
+          type: 'ADD_OPPORTUNITY_FAVORITE', 
+          payload: opportunityId 
+        });
+        
+        addNotification({
+          id: Date.now().toString(),
+          type: 'success',
+          message: 'Opportunité ajoutée aux favoris',
+          timestamp: new Date().toISOString()
+        });
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Add opportunity to favorites error:', error);
+      
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: 'Erreur lors de l\'ajout aux favoris',
+        timestamp: new Date().toISOString()
+      });
+      
+      return false;
+    }
+  };
+
+  const removeOpportunityFromFavorites = async (opportunityId) => {
+    try {
+      console.log('🗑️ Context - removeOpportunityFromFavorites called:', opportunityId);
+      const response = await SecureApiService.removeOpportunityFavorite(state.user.id, opportunityId);
+      
+      if (response.success) {
+        dispatch({ 
+          type: 'REMOVE_OPPORTUNITY_FAVORITE', 
+          payload: opportunityId 
+        });
+        
+        addNotification({
+          id: Date.now().toString(),
+          type: 'success',
+          message: 'Opportunité supprimée des favoris',
+          timestamp: new Date().toISOString()
+        });
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Remove opportunity from favorites error:', error);
+      
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: 'Erreur lors de la suppression des favoris',
+        timestamp: new Date().toISOString()
+      });
+      
+      return false;
+    }
+  };
+
+  const isOpportunityFavorite = (opportunityId) => {
+    return state.opportunityFavorites.includes(opportunityId);
   };
 
   const createEvent = async (eventData) => {
@@ -807,6 +1194,166 @@ export function SecureAppProvider({ children }) {
     } finally {
       dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'events', loading: false } });
     }
+  };
+
+  const updateEvent = async (eventId, eventData) => {
+    try {
+      console.log('🔄 Context - updateEvent called:', { eventId, eventData });
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'events', loading: true } });
+      
+      const response = await SecureApiService.updateEvent(eventId, eventData);
+      
+      dispatch({ type: 'UPDATE_EVENT', payload: response });
+      
+      addNotification({
+        id: Date.now().toString(),
+        type: 'success',
+        message: 'Événement mis à jour avec succès',
+        timestamp: new Date().toISOString()
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Update event error:', error);
+      
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: error.message || 'Erreur lors de la mise à jour de l\'événement',
+        timestamp: new Date().toISOString()
+      });
+      
+      return false;
+    } finally {
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'events', loading: false } });
+    }
+  };
+
+  const deleteEvent = async (eventId) => {
+    try {
+      console.log('🗑️ Context - deleteEvent called:', eventId);
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'events', loading: true } });
+      
+      await SecureApiService.deleteEvent(eventId);
+      
+      dispatch({ type: 'DELETE_EVENT', payload: eventId });
+      
+      addNotification({
+        id: Date.now().toString(),
+        type: 'success',
+        message: 'Événement supprimé avec succès',
+        timestamp: new Date().toISOString()
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Delete event error:', error);
+      
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: error.message || 'Erreur lors de la suppression de l\'événement',
+        timestamp: new Date().toISOString()
+      });
+      
+      return false;
+    } finally {
+      dispatch({ type: 'SET_LOADING_STATE', payload: { operation: 'events', loading: false } });
+    }
+  };
+
+  const loadEventRegistrations = async (userId) => {
+    try {
+      console.log('📋 Context - loadEventRegistrations called:', userId);
+      const response = await SecureApiService.getUserEventRegistrations(userId);
+      dispatch({ type: 'SET_EVENT_REGISTRATIONS', payload: response.registrations || [] });
+      return response.registrations || [];
+    } catch (error) {
+      console.error('Load event registrations error:', error);
+      return [];
+    }
+  };
+
+  const registerForEvent = async (eventId) => {
+    try {
+      console.log('📝 Context - registerForEvent called:', eventId);
+      const response = await SecureApiService.registerForEvent(eventId, state.user.id);
+      
+      if (response.success) {
+        dispatch({ 
+          type: 'ADD_EVENT_REGISTRATION', 
+          payload: eventId 
+        });
+        
+        // Reload event registrations to ensure consistency
+        loadEventRegistrations(state.user.id);
+        
+        addNotification({
+          id: Date.now().toString(),
+          type: 'success',
+          message: 'Inscription réussie !',
+          timestamp: new Date().toISOString()
+        });
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Register for event error:', error);
+      
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: error.message || 'Erreur lors de l\'inscription',
+        timestamp: new Date().toISOString()
+      });
+      
+      return false;
+    }
+  };
+
+  const unregisterFromEvent = async (eventId) => {
+    try {
+      console.log('🚫 Context - unregisterFromEvent called:', eventId);
+      const response = await SecureApiService.unregisterFromEvent(eventId, state.user.id);
+      
+      if (response.success) {
+        dispatch({ 
+          type: 'REMOVE_EVENT_REGISTRATION', 
+          payload: eventId 
+        });
+        
+        // Reload event registrations to ensure consistency
+        loadEventRegistrations(state.user.id);
+        
+        addNotification({
+          id: Date.now().toString(),
+          type: 'success',
+          message: 'Désinscription réussie !',
+          timestamp: new Date().toISOString()
+        });
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Unregister from event error:', error);
+      
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: error.message || 'Erreur lors de la désinscription',
+        timestamp: new Date().toISOString()
+      });
+      
+      return false;
+    }
+  };
+
+  const isRegisteredForEvent = (eventId) => {
+    return state.eventRegistrations.includes(eventId);
   };
 
   // WebSocket functions
@@ -1025,7 +1572,21 @@ export function SecureAppProvider({ children }) {
     markMessagesAsRead: markMessagesAsReadViaWebSocket,
     applyToOpportunity,
     createOpportunity,
+    updateOpportunity,
+    deleteOpportunity,
+    getUserOpportunities,
+    getOpportunityApplications,
+    loadOpportunityFavorites,
+    addOpportunityToFavorites,
+    removeOpportunityFromFavorites,
+    isOpportunityFavorite,
     createEvent,
+    updateEvent,
+    deleteEvent,
+    loadEventRegistrations,
+    registerForEvent,
+    unregisterFromEvent,
+    isRegisteredForEvent,
     updateProfile,
     loadUsers,
     getFilteredUsers,

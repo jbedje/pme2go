@@ -1,6 +1,6 @@
 class SearchApiService {
   constructor() {
-    this.baseURL = 'http://localhost:3008/api';
+    this.baseURL = 'http://localhost:3002/api';
   }
 
   // Get stored token

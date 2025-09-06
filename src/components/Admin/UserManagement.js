@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSecureApp } from '../../contexts/SecureAppContext';
 import adminApi from '../../services/adminApi';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
@@ -21,35 +21,36 @@ function UserManagement({ isSuperAdmin, onLoading }) {
   const [selectedUser, setSelectedUser] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async (currentFilters = filters) => {
     try {
       setLoading(true);
       setError(null);
-      onLoading?.(true);
       
-      const data = await adminApi.getUsers(filters);
+      const data = await adminApi.getUsers(currentFilters);
       setUsers((data?.users || []).map(user => adminApi.formatUserForDisplay(user)));
       setPagination(data?.pagination || {});
     } catch (error) {
       console.error('Error fetching users:', error);
       setError(error.message);
-      addNotification('Failed to load users', 'error');
     } finally {
       setLoading(false);
-      onLoading?.(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchUsers();
-  }, [filters]);
+  }, [fetchUsers]);
 
   const handleFilterChange = (key, value) => {
-    setFilters(prev => ({
-      ...prev,
+    const newFilters = {
+      ...filters,
       [key]: value,
       page: key !== 'page' ? 1 : value // Reset to page 1 when changing filters
-    }));
+    };
+    setFilters(newFilters);
+    
+    // Use the fetchUsers callback with the new filters
+    fetchUsers(newFilters);
   };
 
   const handleBanUser = async (userId, isBanned, reason = '') => {

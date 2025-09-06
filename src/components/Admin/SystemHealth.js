@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useSecureApp } from '../../contexts/SecureAppContext';
 import adminApi from '../../services/adminApi';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 
 function SystemHealth({ onLoading }) {
-  const { addNotification } = useSecureApp();
   const [health, setHealth] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -14,17 +12,14 @@ function SystemHealth({ onLoading }) {
     try {
       setLoading(true);
       setError(null);
-      onLoading?.(true);
       
       const data = await adminApi.getSystemHealth();
       setHealth(adminApi.formatSystemHealth(data));
     } catch (error) {
       console.error('Error fetching system health:', error);
       setError(error.message);
-      addNotification('Failed to load system health', 'error');
     } finally {
       setLoading(false);
-      onLoading?.(false);
     }
   };
 
@@ -117,34 +112,34 @@ function SystemHealth({ onLoading }) {
       {/* Overall Status */}
       <div className="mb-8">
         <div className={`rounded-lg p-6 ${
-          health.status === 'healthy' 
+          health?.status === 'healthy' 
             ? 'bg-green-50 dark:bg-green-900' 
             : 'bg-red-50 dark:bg-red-900'
         }`}>
           <div className="flex items-center">
             <div className={`rounded-full w-12 h-12 flex items-center justify-center ${
-              health.status === 'healthy'
+              health?.status === 'healthy'
                 ? 'bg-green-100 dark:bg-green-800'
                 : 'bg-red-100 dark:bg-red-800'
             }`}>
               <span className="text-2xl">
-                {health.status === 'healthy' ? '✅' : '❌'}
+                {health?.status === 'healthy' ? '✅' : '❌'}
               </span>
             </div>
             <div className="ml-4">
               <h3 className={`text-2xl font-bold ${
-                health.status === 'healthy'
+                health?.status === 'healthy'
                   ? 'text-green-900 dark:text-green-100'
                   : 'text-red-900 dark:text-red-100'
               }`}>
-                System {health.status === 'healthy' ? 'Healthy' : 'Unhealthy'}
+                System {health?.status === 'healthy' ? 'Healthy' : 'Unhealthy'}
               </h3>
               <p className={`${
-                health.status === 'healthy'
+                health?.status === 'healthy'
                   ? 'text-green-700 dark:text-green-300'
                   : 'text-red-700 dark:text-red-300'
               }`}>
-                Last checked: {new Date(health.timestamp).toLocaleString()}
+                Last checked: {health?.timestamp ? new Date(health.timestamp).toLocaleString() : 'Unknown'}
               </p>
             </div>
           </div>
@@ -158,18 +153,18 @@ function SystemHealth({ onLoading }) {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Database</h3>
             <span className="text-2xl">
-              {health.checks.database ? '✅' : '❌'}
+              {health?.checks?.database ? '✅' : '❌'}
             </span>
           </div>
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Status:</span>
               <span className={`font-medium ${
-                health.checks.database 
+                health?.checks?.database 
                   ? 'text-green-600 dark:text-green-400' 
                   : 'text-red-600 dark:text-red-400'
               }`}>
-                {health.checks.database ? 'Connected' : 'Disconnected'}
+                {health?.checks?.database ? 'Connected' : 'Disconnected'}
               </span>
             </div>
           </div>
@@ -185,19 +180,19 @@ function SystemHealth({ onLoading }) {
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">RSS:</span>
               <span className="font-medium text-gray-900 dark:text-white">
-                {health.memoryDisplay.rss}
+                {health?.memoryDisplay?.rss || 'N/A'}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Heap Total:</span>
               <span className="font-medium text-gray-900 dark:text-white">
-                {health.memoryDisplay.heapTotal}
+                {health?.memoryDisplay?.heapTotal || 'N/A'}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Heap Used:</span>
               <span className="font-medium text-gray-900 dark:text-white">
-                {health.memoryDisplay.heapUsed}
+                {health?.memoryDisplay?.heapUsed || 'N/A'}
               </span>
             </div>
           </div>
@@ -213,13 +208,13 @@ function SystemHealth({ onLoading }) {
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Duration:</span>
               <span className="font-medium text-gray-900 dark:text-white">
-                {health.uptimeDisplay}
+                {health?.uptimeDisplay || 'N/A'}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Started:</span>
               <span className="font-medium text-gray-900 dark:text-white">
-                {new Date(Date.now() - (health.checks.uptime * 1000)).toLocaleString()}
+                {health?.checks?.uptime ? new Date(Date.now() - (health.checks.uptime * 1000)).toLocaleString() : 'N/A'}
               </span>
             </div>
           </div>
@@ -235,7 +230,7 @@ function SystemHealth({ onLoading }) {
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Status:</span>
               <span className="font-medium text-yellow-600 dark:text-yellow-400">
-                {health.checks.disk_space}
+                {health?.checks?.disk_space || 'Not monitored'}
               </span>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400">

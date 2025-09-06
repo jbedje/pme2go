@@ -38,7 +38,8 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "server": "node server/index.js",
-    "dev": "concurrently \"npm run server\" \"npm run start:win\"",
+    "dev": "concurrently \"npm run server\" \"npm run websocket\" \"npm run start:win\"",
+    "websocket": "node server/websocket-server.js",
     "start:win": "set PORT=3001 && react-scripts start",
     "migrate": "node server/migrate.js"
   },
