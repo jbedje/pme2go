@@ -44,7 +44,11 @@
       "Bash(PGPASSWORD=Postgres2024! psql -U postgres -d \"pme-360-db\" -c \"\\dt\")",
       "Bash(PGPASSWORD=Postgres2024! psql -U postgres -d \"pme-360-db\" -c \"\\d applications\")",
       "Bash(PGPASSWORD=Postgres2024! psql:*)",
-      "Bash(set PORT=3003)"
+      "Bash(set PORT=3003)",
+      "Bash(copy:*)",
+      "Bash(set PORT=3002)",
+      "Bash(dir:*)",
+      "Bash(touch:*)"
     ],
     "deny": [],
     "ask": []

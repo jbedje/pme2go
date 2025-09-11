@@ -1,0 +1,55 @@
+services:
+  # Main application service
+  - type: web
+    name: pme2go-app
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: node server/production-server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: SERVER_PORT
+        value: 10000
+      - key: WEBSOCKET_PORT
+        value: 10001
+      - key: DB_HOST
+        fromDatabase:
+          name: pme2go-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: pme2go-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: pme2go-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: pme2go-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: pme2go-db
+          property: password
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pme2go-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: BCRYPT_ROUNDS
+        value: 12
+    healthCheckPath: /api/health
+
+databases:
+  - name: pme2go-db
+    databaseName: pme2go_production
+    user: pme2go_user
+    plan: free

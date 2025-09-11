@@ -56,11 +56,21 @@ function SystemSettings({ isSuperAdmin, onLoading }) {
       }));
       
       await adminApi.updateSystemSettings(settingsToUpdate);
-      addNotification('System settings updated successfully', 'success');
+      addNotification({
+        id: Date.now().toString(),
+        type: 'success',
+        message: 'System settings updated successfully',
+        timestamp: new Date().toISOString()
+      });
       fetchSettings(); // Refresh to get updated timestamps
     } catch (error) {
       console.error('Error saving system settings:', error);
-      addNotification('Failed to save system settings', 'error');
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: 'Failed to save system settings',
+        timestamp: new Date().toISOString()
+      });
     } finally {
       setSaving(false);
     }

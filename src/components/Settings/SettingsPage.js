@@ -106,13 +106,23 @@ function SettingsPage() {
       if (response.ok) {
         const updatedUser = await response.json();
         updateUser(updatedUser);
-        addNotification('Profil mis à jour avec succès', 'success');
+        addNotification({
+          id: Date.now().toString(),
+          type: 'success',
+          message: 'Profil mis à jour avec succès',
+          timestamp: new Date().toISOString()
+        });
       } else {
         throw new Error('Failed to update profile');
       }
     } catch (error) {
       console.error('Error updating profile:', error);
-      addNotification('Erreur lors de la mise à jour du profil', 'error');
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: 'Erreur lors de la mise à jour du profil',
+        timestamp: new Date().toISOString()
+      });
     } finally {
       setSaving(false);
     }
@@ -120,12 +130,22 @@ function SettingsPage() {
 
   const handlePasswordChange = async () => {
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      addNotification('Les mots de passe ne correspondent pas', 'error');
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: 'Les mots de passe ne correspondent pas',
+        timestamp: new Date().toISOString()
+      });
       return;
     }
 
     if (passwordData.newPassword.length < 6) {
-      addNotification('Le mot de passe doit contenir au moins 6 caractères', 'error');
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: 'Le mot de passe doit contenir au moins 6 caractères',
+        timestamp: new Date().toISOString()
+      });
       return;
     }
 
@@ -144,13 +164,23 @@ function SettingsPage() {
 
       if (response.ok) {
         setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-        addNotification('Mot de passe modifié avec succès', 'success');
+        addNotification({
+          id: Date.now().toString(),
+          type: 'success',
+          message: 'Mot de passe modifié avec succès',
+          timestamp: new Date().toISOString()
+        });
       } else {
         throw new Error('Failed to change password');
       }
     } catch (error) {
       console.error('Error changing password:', error);
-      addNotification('Erreur lors du changement de mot de passe', 'error');
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: 'Erreur lors du changement de mot de passe',
+        timestamp: new Date().toISOString()
+      });
     } finally {
       setSaving(false);
     }
@@ -158,12 +188,22 @@ function SettingsPage() {
 
   const handleNotificationSave = () => {
     // Save notification settings
-    addNotification('Paramètres de notification sauvegardés', 'success');
+    addNotification({
+      id: Date.now().toString(),
+      type: 'success',
+      message: 'Paramètres de notification sauvegardés',
+      timestamp: new Date().toISOString()
+    });
   };
 
   const handlePrivacySave = () => {
     // Save privacy settings
-    addNotification('Paramètres de confidentialité sauvegardés', 'success');
+    addNotification({
+      id: Date.now().toString(),
+      type: 'success',
+      message: 'Paramètres de confidentialité sauvegardés',
+      timestamp: new Date().toISOString()
+    });
   };
 
   const tabs = [

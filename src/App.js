@@ -16,6 +16,18 @@ import EventsPage from './components/Events/EventsPage';
 import AdminDashboard from './components/Admin/AdminDashboard';
 import FavoritesPage from './components/Favorites/FavoritesPage';
 import SettingsPage from './components/Settings/SettingsPage';
+// PME-specific components
+import FinancementPage from './components/PME/FinancementPage';
+import MonPitchPage from './components/PME/MonPitchPage';
+import MetriquesPage from './components/PME/MetriquesPage';
+// Investor-specific components
+import PipelinePage from './components/Investor/PipelinePage';
+import PortefeuillePage from './components/Investor/PortefeuillePage';
+import DueDiligencePage from './components/Investor/DueDiligencePage';
+// Expert-specific components
+import ExpertPortfolioPage from './components/Expert/PortfolioPage';
+import PlanningPage from './components/Expert/PlanningPage';
+import FacturationPage from './components/Expert/FacturationPage';
 import { LoadingSpinner } from './components/UI/LoadingSpinner';
 
 // Composant NotificationToast pour afficher les notifications
@@ -36,9 +48,9 @@ function NotificationToast() {
 
   return (
     <div className="fixed top-4 right-4 z-50 space-y-2">
-      {notifications.slice(0, 3).map((notification) => (
+      {notifications.slice(0, 3).map((notification, index) => (
         <div
-          key={notification.id}
+          key={notification.id || `notification-${index}`}
           className={`max-w-sm p-4 rounded-lg shadow-lg border transition-all duration-300 transform ${
             notification.type === 'success' 
               ? 'bg-success-50 border-success-200 text-success-800' :
@@ -122,6 +134,27 @@ function AuthenticatedLayout() {
         return <ProfilePlaceholder />;
       case 'admin':
         return <AdminDashboard />;
+      // PME-specific routes
+      case 'funding':
+        return <FinancementPage />;
+      case 'pitch':
+        return <MonPitchPage />;
+      case 'metrics':
+        return <MetriquesPage />;
+      // Investor-specific routes
+      case 'pipeline':
+        return <PipelinePage />;
+      case 'portfolio':
+        return <PortefeuillePage />;
+      case 'due-diligence':
+        return <DueDiligencePage />;
+      // Expert-specific routes
+      case 'expert-portfolio':
+        return <ExpertPortfolioPage />;
+      case 'planning':
+        return <PlanningPage />;
+      case 'facturation':
+        return <FacturationPage />;
       default:
         return <Dashboard />;
     }

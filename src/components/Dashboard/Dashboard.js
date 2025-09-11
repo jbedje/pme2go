@@ -11,7 +11,11 @@ import {
   Award,
   ArrowUp,
   ArrowRight,
-  Plus
+  Plus,
+  BarChart3,
+  FileText,
+  Clock,
+  Euro
 } from 'lucide-react';
 import { useSecureApp } from '../../contexts/SecureAppContext';
 import { UserCard, OpportunityCard, EventCard } from '../UI/Card';
@@ -116,27 +120,81 @@ export default function Dashboard() {
       recommendations.push(
         {
           title: 'Complétez votre pitch deck',
-          description: 'Augmentez vos chances de financement en finalisant votre présentation.',
-          action: 'Compléter',
+          description: 'Finalisez votre présentation pour attirer les investisseurs.',
+          action: 'Créer mon pitch',
           color: 'bg-blue-50 border-blue-200',
-          icon: Briefcase
+          icon: Briefcase,
+          view: 'pitch'
         },
         {
-          title: 'Connectez-vous avec des investisseurs',
-          description: '5 nouveaux investisseurs correspondent à votre profil.',
-          action: 'Voir les profils',
+          title: 'Explorez les opportunités de financement',
+          description: '12 nouvelles opportunités de financement disponibles.',
+          action: 'Voir le financement',
           color: 'bg-green-50 border-green-200',
-          icon: Users
+          icon: DollarSign,
+          view: 'funding'
+        },
+        {
+          title: 'Analysez vos métriques',
+          description: 'Suivez vos performances et votre croissance.',
+          action: 'Voir les métriques',
+          color: 'bg-purple-50 border-purple-200',
+          icon: BarChart3,
+          view: 'metrics'
         }
       );
     } else if (user.type === USER_TYPES.INVESTOR) {
       recommendations.push(
         {
-          title: 'Nouvelles opportunités d\'investissement',
-          description: '3 startups prometteuses recherchent un financement.',
-          action: 'Explorer',
+          title: 'Gérez votre pipeline d\'investissement',
+          description: '5 nouvelles opportunités à analyser et 3 deals en négociation.',
+          action: 'Voir le pipeline',
           color: 'bg-purple-50 border-purple-200',
-          icon: Target
+          icon: Target,
+          view: 'pipeline'
+        },
+        {
+          title: 'Suivez votre portefeuille',
+          description: 'Performance +25% ce trimestre, 2 sorties planifiées.',
+          action: 'Voir le portefeuille',
+          color: 'bg-blue-50 border-blue-200',
+          icon: Briefcase,
+          view: 'portfolio'
+        },
+        {
+          title: 'Due diligences en cours',
+          description: '3 DD actives à finaliser avant fin du mois.',
+          action: 'Voir les DD',
+          color: 'bg-green-50 border-green-200',
+          icon: FileText,
+          view: 'due-diligence'
+        }
+      );
+    } else if (user.type === USER_TYPES.EXPERT) {
+      recommendations.push(
+        {
+          title: 'Gérez votre portfolio projets',
+          description: '5 projets actifs, 2 en attente de validation client.',
+          action: 'Voir le portfolio',
+          color: 'bg-blue-50 border-blue-200',
+          icon: Briefcase,
+          view: 'expert-portfolio'
+        },
+        {
+          title: 'Organisez votre planning',
+          description: '3 RDV cette semaine, 2 consultations à programmer.',
+          action: 'Voir le planning',
+          color: 'bg-green-50 border-green-200',
+          icon: Clock,
+          view: 'planning'
+        },
+        {
+          title: 'Suivez votre facturation',
+          description: '2 factures impayées, CA mensuel: 15k€.',
+          action: 'Voir la facturation',
+          color: 'bg-yellow-50 border-yellow-200',
+          icon: Euro,
+          view: 'facturation'
         }
       );
     }
@@ -218,6 +276,7 @@ export default function Dashboard() {
               <div 
                 key={index} 
                 className={`border-2 ${rec.color} rounded-xl p-6 hover:shadow-lg transition-shadow cursor-pointer`}
+                onClick={() => rec.view && setView(rec.view)}
               >
                 <div className="flex items-start space-x-4">
                   <div className="p-3 bg-white rounded-lg shadow-sm">
@@ -226,7 +285,13 @@ export default function Dashboard() {
                   <div className="flex-1">
                     <h3 className="font-semibold text-gray-900 mb-2">{rec.title}</h3>
                     <p className="text-gray-600 text-sm mb-4">{rec.description}</p>
-                    <button className="btn-primary text-sm px-4 py-2">
+                    <button 
+                      className="btn-primary text-sm px-4 py-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        rec.view && setView(rec.view);
+                      }}
+                    >
                       {rec.action}
                     </button>
                   </div>

@@ -146,10 +146,20 @@ function ProfilePage() {
     try {
       await updateProfile(formData);
       setIsEditing(false);
-      addNotification('Profil mis à jour avec succès', 'success');
+      addNotification({
+        id: Date.now().toString(),
+        type: 'success',
+        message: 'Profil mis à jour avec succès',
+        timestamp: new Date().toISOString()
+      });
     } catch (error) {
       console.error('Error updating profile:', error);
-      addNotification('Erreur lors de la mise à jour du profil', 'error');
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: 'Erreur lors de la mise à jour du profil',
+        timestamp: new Date().toISOString()
+      });
     }
   };
 
@@ -160,7 +170,12 @@ function ProfilePage() {
 
     try {
       // TODO: Implement password change API
-      addNotification('Mot de passe mis à jour avec succès', 'success');
+      addNotification({
+        id: Date.now().toString(),
+        type: 'success',
+        message: 'Mot de passe mis à jour avec succès',
+        timestamp: new Date().toISOString()
+      });
       setShowPasswordForm(false);
       setPasswordData({
         currentPassword: '',
@@ -169,7 +184,12 @@ function ProfilePage() {
       });
     } catch (error) {
       console.error('Error changing password:', error);
-      addNotification('Erreur lors du changement de mot de passe', 'error');
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: 'Erreur lors du changement de mot de passe',
+        timestamp: new Date().toISOString()
+      });
     }
   };
 

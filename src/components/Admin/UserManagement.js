@@ -74,11 +74,21 @@ function UserManagement({ isSuperAdmin, onLoading }) {
 
     try {
       await adminApi.deleteUser(userId);
-      addNotification('User deleted successfully', 'success');
+      addNotification({
+        id: Date.now().toString(),
+        type: 'success',
+        message: 'User deleted successfully',
+        timestamp: new Date().toISOString()
+      });
       fetchUsers(); // Refresh the list
     } catch (error) {
       console.error('Error deleting user:', error);
-      addNotification('Failed to delete user', 'error');
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: 'Failed to delete user',
+        timestamp: new Date().toISOString()
+      });
     }
   };
 
@@ -90,13 +100,23 @@ function UserManagement({ isSuperAdmin, onLoading }) {
   const handleSaveUser = async (userId, userData) => {
     try {
       await adminApi.updateUser(userId, userData);
-      addNotification('User updated successfully', 'success');
+      addNotification({
+        id: Date.now().toString(),
+        type: 'success',
+        message: 'User updated successfully',
+        timestamp: new Date().toISOString()
+      });
       setShowEditModal(false);
       setSelectedUser(null);
       fetchUsers(); // Refresh the list
     } catch (error) {
       console.error('Error updating user:', error);
-      addNotification('Failed to update user', 'error');
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: 'Failed to update user',
+        timestamp: new Date().toISOString()
+      });
     }
   };
 

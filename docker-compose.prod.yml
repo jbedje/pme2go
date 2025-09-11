@@ -1,180 +1,111 @@
 version: '3.8'
 
 services:
-  # PME2GO API Service
-  api:
-    build: .
-    container_name: pme2go-api
-    restart: unless-stopped
-    ports:
-      - "3004:3004"
-    environment:
-      # Database Configuration
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=${DB_NAME:-pme2go}
-      - DB_USER=${DB_USER:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD}
-      
-      # Security Configuration
-      - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
-      - BCRYPT_ROUNDS=${BCRYPT_ROUNDS:-12}
-      
-      # Email Configuration
-      - SMTP_HOST=${SMTP_HOST}
-      - SMTP_PORT=${SMTP_PORT:-587}
-      - SMTP_SECURE=${SMTP_SECURE:-false}
-      - SMTP_USER=${SMTP_USER}
-      - SMTP_PASS=${SMTP_PASS}
-      - FROM_EMAIL=${FROM_EMAIL}
-      - FROM_NAME=${FROM_NAME:-PME2GO}
-      
-      # Application Configuration
-      - NODE_ENV=production
-      - PORT=3004
-      - FRONTEND_URL=${FRONTEND_URL:-https://pme2go.com}
-      - API_BASE_URL=${API_BASE_URL:-https://api.pme2go.com}
-      
-      # Backup Configuration
-      - BACKUP_DIR=/app/backups
-      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-30}
-      - BACKUP_COMPRESSION_LEVEL=${BACKUP_COMPRESSION_LEVEL:-6}
-      
-      # Performance Configuration
-      - PERFORMANCE_ALERTS_ENABLED=${PERFORMANCE_ALERTS_ENABLED:-true}
-      - MAX_REQUEST_SIZE=${MAX_REQUEST_SIZE:-10mb}
-      - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-15}
-      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-100}
-    
-    volumes:
-      - ./logs:/app/logs
-      - ./backups:/app/backups
-      - ./uploads:/app/uploads
-      - ./data:/app/data
-    
-    depends_on:
-      - postgres
-      - redis
-    
-    networks:
-      - pme2go-network
-    
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.api.rule=Host(`api.pme2go.com`)"
-      - "traefik.http.routers.api.tls=true"
-      - "traefik.http.routers.api.tls.certresolver=letsencrypt"
-
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
-    container_name: pme2go-postgres
-    restart: unless-stopped
+    container_name: pme2go_postgres
     environment:
-      - POSTGRES_DB=${DB_NAME:-pme2go}
-      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_DB=pme2go_production
+      - POSTGRES_USER=pme2go_user
       - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_INITDB_ARGS="--auth-host=scram-sha-256"
-    
+      - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init:/docker-entrypoint-initdb.d
-      - ./database/backups:/backups
-    
+      - ./server/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     ports:
       - "5432:5432"
-    
     networks:
-      - pme2go-network
-    
+      - pme2go_network
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-pme2go}"]
+      test: ["CMD-SHELL", "pg_isready -U pme2go_user -d pme2go_production"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Redis Cache
+  # Redis for caching and sessions
   redis:
     image: redis:7-alpine
-    container_name: pme2go-redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    container_name: pme2go_redis
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
+    ports:
+      - "6379:6379"
     networks:
-      - pme2go-network
+      - pme2go_network
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
-      timeout: 3s
+      timeout: 5s
       retries: 5
+
+  # PME2GO Application
+  pme2go_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pme2go_app
+    env_file:
+      - .env.production
+    environment:
+      - DB_HOST=postgres
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "3001:3001"  # Frontend
+      - "3002:3002"  # API
+      - "3005:3005"  # WebSocket
+    volumes:
+      - app_uploads:/app/uploads
+      - app_logs:/app/logs
+    networks:
+      - pme2go_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Nginx Reverse Proxy
   nginx:
     image: nginx:alpine
-    container_name: pme2go-nginx
-    restart: unless-stopped
+    container_name: pme2go_nginx
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./nginx/conf.d:/etc/nginx/conf.d
-      - ./ssl:/etc/ssl/certs
-      - ./logs/nginx:/var/log/nginx
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    networks:
+      - pme2go_network
     depends_on:
-      - api
-    networks:
-      - pme2go-network
-
-  # Monitoring with Prometheus
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: pme2go-prometheus
+      - pme2go_app
     restart: unless-stopped
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-    networks:
-      - pme2go-network
 
-  # Grafana Dashboard
-  grafana:
-    image: grafana/grafana:latest
-    container_name: pme2go-grafana
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin123}
-      - GF_USERS_ALLOW_SIGN_UP=false
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
-      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
-    networks:
-      - pme2go-network
+networks:
+  pme2go_network:
+    driver: bridge
 
 volumes:
   postgres_data:
     driver: local
   redis_data:
     driver: local
-  prometheus_data:
+  app_uploads:
     driver: local
-  grafana_data:
+  app_logs:
     driver: local
-
-networks:
-  pme2go-network:
-    driver: bridge
+  nginx_logs:
+    driver: local

@@ -19,7 +19,12 @@ function AdminDashboard() {
 
   useEffect(() => {
     if (!hasAdminAccess) {
-      addNotification('Access denied - Admin privileges required', 'error');
+      addNotification({
+        id: Date.now().toString(),
+        type: 'error',
+        message: 'Access denied - Admin privileges required',
+        timestamp: new Date().toISOString()
+      });
     }
   }, [hasAdminAccess, addNotification]);
 
