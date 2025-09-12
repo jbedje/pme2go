@@ -4,39 +4,32 @@ module.exports = {
       name: 'pme2go-api',
       script: 'server/production-server.js',
       instances: 1,
-      exec_mode: 'cluster',
+      exec_mode: 'fork',
       env: {
         NODE_ENV: 'production',
-        PORT: 3001,
-        SERVER_PORT: 3002,
-        WEBSOCKET_PORT: 3005
+        PORT: 3002,
+        SERVER_PORT: 3002
       },
-      env_production: {
-        NODE_ENV: 'production'
-      },
-      error_file: 'logs/api-error.log',
-      out_file: 'logs/api-out.log',
-      log_file: 'logs/api.log',
+      error_file: '/var/log/pm2/pme2go-api-error.log',
+      out_file: '/var/log/pm2/pme2go-api-out.log',
+      log_file: '/var/log/pm2/pme2go-api.log',
       time: true,
       autorestart: true,
       watch: false,
-      max_memory_restart: '1G',
-      node_args: '--max-old-space-size=1024'
+      max_memory_restart: '1G'
     },
     {
-      name: 'pme2go-websocket',
-      script: 'server/websocket-server.js',
+      name: 'pme2go-frontend',
+      script: 'serve',
+      args: ['-s', 'build', '-l', '3001'],
       instances: 1,
+      exec_mode: 'fork',
       env: {
-        NODE_ENV: 'production',
-        WEBSOCKET_PORT: 3005
-      },
-      env_production: {
         NODE_ENV: 'production'
       },
-      error_file: 'logs/ws-error.log',
-      out_file: 'logs/ws-out.log',
-      log_file: 'logs/ws.log',
+      error_file: '/var/log/pm2/pme2go-frontend-error.log',
+      out_file: '/var/log/pm2/pme2go-frontend-out.log',
+      log_file: '/var/log/pm2/pme2go-frontend.log',
       time: true,
       autorestart: true,
       watch: false,
